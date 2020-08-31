@@ -15,18 +15,22 @@ kind: Deployment
 metadata:
   name: {{ template "traefik.fullname" . }}
   labels:
-    app: {{ template "traefik.name" . }}
-    chart: {{ template "traefik.chart" . }}
-    release: {{ .Release.Name | quote }}
-    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ template "traefik.name" . }}
+    helm.sh/chart: {{ template "traefik.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+  {{- with .Values.deployment.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  {{- if not .Values.autoscaling }}
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ default 1 .Values.deployment.replicas }}
   {{- end }}
   selector:
     matchLabels:
-      app: {{ template "traefik.name" . }}
-      release: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ template "traefik.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -35,23 +39,29 @@ spec:
       {{- end }}
   template:
     metadata:
-      {{- if .Values.deployment.podAnnotations }}
       annotations:
-      {{- range $key, $value := .Values.deployment.podAnnotations }}
-        {{ $key }}: {{ $value | quote }}
-      {{- end }}
+      {{- with .Values.deployment.podAnnotations }}
+      {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        app: {{ template "traefik.name" . }}
-        chart: {{ template "traefik.chart" . }}
-        release: {{ .Release.Name | quote }}
-        heritage: {{ .Release.Service | quote }}
+        app.kubernetes.io/name: {{ template "traefik.name" . }}
+        helm.sh/chart: {{ template "traefik.chart" . }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
-      serviceAccountName: {{ template "traefik.fullname" . }}
+      serviceAccountName: {{ include "traefik.serviceAccountName" . }}
       terminationGracePeriodSeconds: 60
       hostNetwork: {{ .Values.hostNetwork }}
+      {{- with .Values.deployment.dnsPolicy }}
+      dnsPolicy: {{ . }}
+      {{- end }}
+      {{- with .Values.deployment.initContainers }}
+      initContainers:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
       containers:
       - image: {{ .Values.image.name }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: {{ template "traefik.fullname" . }}
         resources:
           {{- with .Values.resources }}
@@ -77,31 +87,104 @@ spec:
           timeoutSeconds: 2
         ports:
         {{- range $name, $config := .Values.ports }}
+        {{- if $config }}
         - name: {{ $name | quote }}
           containerPort: {{ $config.port }}
           {{- if $config.hostPort }}
           hostPort: {{ $config.hostPort }}
           {{- end }}
-          protocol: TCP
+          {{- if $config.hostIP }}
+          hostIP: {{ $config.hostIP }}
+          {{- end }}
+          protocol: {{ default "TCP" $config.protocol | quote }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         volumeMounts:
           - name: data
             mountPath: {{ .Values.persistence.path }}
+            {{- if .Values.persistence.subPath }}
+            subPath: {{ .Values.persistence.subPath }}
+            {{- end }}
+          - name: tmp
+            mountPath: /tmp
           {{- range .Values.volumes }}
           - name: {{ .name }}
             mountPath: {{ .mountPath }}
             readOnly: true
           {{- end }}
         args:
-          - "--global.checknewversion={{ .Values.additional.checkNewVersion }}"
-          - "--global.sendanonymoususage={{ .Values.additional.sendAnonymousUsage}}"
+          {{- with .Values.globalArguments }}
+          {{- range . }}
+          - {{ . | quote }}
+          {{- end }}
+          {{- end }}
           {{- range $name, $config := .Values.ports }}
-          - "--entryPoints.{{$name}}.address=:{{ $config.port }}"
+          {{- if $config }}
+          - "--entryPoints.{{$name}}.address=:{{ $config.port }}/{{ default "tcp" $config.protocol | lower }}"
+          {{- end }}
           {{- end }}
           - "--api.dashboard=true"
           - "--ping=true"
+          {{- if .Values.providers.kubernetesCRD.enabled }}
           - "--providers.kubernetescrd"
-          - "--log.level={{ .Values.logs.loglevel }}"
+          {{- end }}
+          {{- if .Values.providers.kubernetesIngress.enabled }}
+          - "--providers.kubernetesingress"
+          {{- if and .Values.service.enabled .Values.providers.kubernetesIngress.publishedService.enabled }}
+          - "--providers.kubernetesingress.ingressendpoint.publishedservice={{ template "providers.kubernetesIngress.publishedServicePath" . }}"
+          {{- end }}
+          {{- end }}
+          {{- if and .Values.rbac.enabled .Values.rbac.namespaced }}
+          - "--providers.kubernetescrd.namespaces={{ .Release.Namespace }}"
+          - "--providers.kubernetesingress.namespaces={{ .Release.Namespace }}"
+          {{- end }}
+          {{- range $entrypoint, $config := $.Values.ports }}
+          {{- if $config.redirectTo }}
+          {{- $toPort := index $.Values.ports $config.redirectTo }}
+          - "--entrypoints.{{ $entrypoint }}.http.redirections.entryPoint.to=:{{ $toPort.exposedPort }}"
+          - "--entrypoints.{{ $entrypoint }}.http.redirections.entryPoint.scheme=https"
+          {{- end }}
+          {{- end }}
+          {{- with .Values.logs }}
+          {{- if .general.format }}
+          - "--log.format={{ .general.format }}"
+          {{- end }}
+          {{- if ne .general.level "ERROR" }}
+          - "--log.level={{ .general.level | upper }}"
+          {{- end }}
+          {{- if .access.enabled }}
+          - "--accesslog=true"
+          {{- if .access.format }}
+          - "--accesslog.format={{ .access.format }}"
+          {{- end }}
+          {{- if .access.bufferingsize }}
+          - "--accesslog.bufferingsize={{ .access.bufferingsize }}"
+          {{- end }}
+          {{- if .access.filters }}
+          {{- if .access.filters.statuscodes }}
+          - "--accesslog.filters.statuscodes={{ .access.filters.statuscodes }}"
+          {{- end }}
+          {{- if .access.filters.retryattempts }}
+          - "--accesslog.filters.retryattempts"
+          {{- end }}
+          {{- if .access.filters.minduration }}
+          - "--accesslog.filters.minduration={{ .access.filters.minduration }}"
+          {{- end }}
+          {{- end }}
+          - "--accesslog.fields.defaultmode={{ .access.fields.general.defaultmode }}"
+          {{- range $fieldname, $fieldaction := .access.fields.general.names }}
+          - "--accesslog.fields.names.{{ $fieldname }}={{ $fieldaction }}"
+          {{- end }}
+          - "--accesslog.fields.headers.defaultmode={{ .access.fields.headers.defaultmode }}"
+          {{- range $fieldname, $fieldaction := .access.fields.headers.names }}
+          - "--accesslog.fields.headers.names.{{ $fieldname }}={{ $fieldaction }}"
+          {{- end }}
+          {{- end }}
+          {{- end }}
           {{- with .Values.additionalArguments }}
           {{- range . }}
           - {{ . | quote }}
@@ -111,21 +194,23 @@ spec:
         env:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-          {{- range .Values.secretEnv }}
-          - name: {{ .name }}
-            valueFrom:
-              secretKeyRef:
-                name: {{ .secretName }}
-                key: {{ .secretKey }}
-          {{- end }}
+        {{- with .Values.envFrom }}
+        envFrom:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- if .Values.deployment.additionalContainers }}
+        {{- toYaml .Values.deployment.additionalContainers | nindent 6 }}
+      {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ template "traefik.fullname" . }}
+            claimName: {{ default (include "traefik.fullname" .) .Values.persistence.existingClaim }}
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: tmp
+          emptyDir: {}
         {{- range .Values.volumes }}
         - name: {{ .name }}
           {{- if eq .type "secret" }}
@@ -148,5 +233,11 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end -}}
