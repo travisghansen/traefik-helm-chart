@@ -4,10 +4,10 @@ kind: Service
 metadata:
   name: {{ template "traefik.fullname" . }}-dashboard
   labels:
-    app: {{ template "traefik.name" . }}
-    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
-    release: {{ .Release.Name | quote }}
-    heritage: {{ .Release.Service | quote }}
+    app.kubernetes.io/name: {{ template "traefik.name" . }}
+    helm.sh/chart: {{ template "traefik.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
   {{- with .Values.dashboard.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -19,8 +19,8 @@ spec:
   {{- toYaml . | nindent 2 }}
   {{- end }}
   selector:
-    app: {{ template "traefik.name" . }}
-    release: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ template "traefik.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
   {{- $config := .Values.ports.traefik }}
   - port: {{ default $config.port $config.exposedPort }}
