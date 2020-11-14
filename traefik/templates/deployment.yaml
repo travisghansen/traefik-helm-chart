@@ -49,6 +49,10 @@ spec:
         app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      {{- with .Values.deployment.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "traefik.serviceAccountName" . }}
       terminationGracePeriodSeconds: 60
       hostNetwork: {{ .Values.hostNetwork }}
@@ -60,7 +64,7 @@ spec:
       {{- toYaml . | nindent 6 }}
       {{- end }}
       containers:
-      - image: {{ .Values.image.name }}:{{ .Values.image.tag }}
+      - image: "{{ .Values.image.name }}:{{ default .Chart.AppVersion .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: {{ template "traefik.fullname" . }}
         resources:
@@ -111,10 +115,18 @@ spec:
             {{- end }}
           - name: tmp
             mountPath: /tmp
+          {{- $root := . }}
           {{- range .Values.volumes }}
-          - name: {{ .name }}
+          - name: {{ tpl (.name) $root }}
             mountPath: {{ .mountPath }}
             readOnly: true
+          {{- end }}
+          {{- if .Values.experimental.plugins.enabled }}
+          - name: plugins
+            mountPath: "/plugins-storage"
+          {{- end }}
+          {{- if .Values.additionalVolumeMounts }}
+            {{- toYaml .Values.additionalVolumeMounts | nindent 10 }}
           {{- end }}
         args:
           {{- with .Values.globalArguments }}
@@ -139,14 +151,35 @@ spec:
           {{- end }}
           {{- end }}
           {{- if and .Values.rbac.enabled .Values.rbac.namespaced }}
-          - "--providers.kubernetescrd.namespaces={{ .Release.Namespace }}"
-          - "--providers.kubernetesingress.namespaces={{ .Release.Namespace }}"
+          - "--providers.kubernetescrd.namespaces={{ template "providers.kubernetesCRD.namespaces" . }}"
+          - "--providers.kubernetesingress.namespaces={{ template "providers.kubernetesIngress.namespaces" . }}"
           {{- end }}
           {{- range $entrypoint, $config := $.Values.ports }}
           {{- if $config.redirectTo }}
           {{- $toPort := index $.Values.ports $config.redirectTo }}
           - "--entrypoints.{{ $entrypoint }}.http.redirections.entryPoint.to=:{{ $toPort.exposedPort }}"
           - "--entrypoints.{{ $entrypoint }}.http.redirections.entryPoint.scheme=https"
+          {{- end }}
+          {{- if $config.tls }}
+          {{- if $config.tls.enabled }}
+          - "--entrypoints.{{ $entrypoint }}.http.tls=true"
+          {{- if $config.tls.options }}
+          - "--entrypoints.{{ $entrypoint }}.http.tls.options={{ $config.tls.options }}"
+          {{- end }}
+          {{- if $config.tls.certResolver }}
+          - "--entrypoints.{{ $entrypoint }}.http.tls.certResolver={{ $config.tls.certResolver }}"
+          {{- end }}
+          {{- if $config.tls.domains }}
+          {{- range $index, $domain := $config.tls.domains }}
+          {{- if $domain.main }}
+          - "--entrypoints.{{ $entrypoint }}.http.tls.domains[{{ $index }}].main={{ $domain.main }}"
+          {{- end }}
+          {{- if $domain.sans }}
+          - "--entrypoints.{{ $entrypoint }}.http.tls.domains[{{ $index }}].sans={{ join "," $domain.sans }}"
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
           {{- end }}
           {{- end }}
           {{- with .Values.logs }}
@@ -185,6 +218,9 @@ spec:
           {{- end }}
           {{- end }}
           {{- end }}
+          {{- if .Values.pilot.enabled }}
+          - "--pilot.token={{ .Values.pilot.token }}"
+          {{- end }}
           {{- with .Values.additionalArguments }}
           {{- range . }}
           - {{ . | quote }}
@@ -211,15 +247,23 @@ spec:
           {{- end }}
         - name: tmp
           emptyDir: {}
+        {{- $root := . }}
         {{- range .Values.volumes }}
-        - name: {{ .name }}
+        - name: {{ tpl (.name) $root }}
           {{- if eq .type "secret" }}
           secret:
-            secretName: {{ .name }}
+            secretName: {{ tpl (.name) $root }}
           {{- else if eq .type "configMap" }}
           configMap:
-            name: {{ .name }}
+            name: {{ tpl (.name) $root }}
           {{- end }}
+        {{- end }}
+        {{- if .Values.deployment.additionalVolumes }}
+          {{- toYaml .Values.deployment.additionalVolumes | nindent 8 }}
+        {{- end }}
+        {{- if .Values.experimental.plugins.enabled }}
+        - name: plugins
+          emptyDir: {}
         {{- end }}
       {{- with .Values.affinity }}
       affinity:

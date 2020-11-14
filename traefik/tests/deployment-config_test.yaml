@@ -48,15 +48,15 @@ tests:
     set:
       deployment:
         annotations:
-          containous/powpow: annotations
+          traefik/powpow: annotations
         podAnnotations:
-          containous/powpow: podAnnotations
+          traefik/powpow: podAnnotations
     asserts:
       - equal:
-          path: metadata.annotations.containous/powpow
+          path: metadata.annotations.traefik/powpow
           value: annotations
       - equal:
-          path: spec.template.metadata.annotations.containous/powpow
+          path: spec.template.metadata.annotations.traefik/powpow
           value: podAnnotations
   - it: should have envFrom with specified values
     set:
@@ -146,6 +146,20 @@ tests:
         - equal:
             path: spec.additionalContainers[0].name
             value: bar
+  - it: should have additional volumes
+    set:
+      deployment:
+        additionalVolumes:
+          - hostpath:
+              path: /foo
+            name: bar
+      asserts:
+        - equal:
+            path: spec.template.spec.volumes[4].hostpath.path
+            value: /foo
+        - equal:
+            path: spec.template.spec.volumes[4].name
+            value: bar
   - it: should have imagePullPolicy with specified value
     set:
       image:
@@ -154,3 +168,30 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].imagePullPolicy
           value: Always
+  - it: should have no imagePullSecrets
+    asserts:
+      - isEmpty:
+          path: spec.template.spec.imagePullSecrets
+  - it: should have imagePullSecrets with specified value
+    set:
+      deployment:
+        imagePullSecrets: 
+          - name: myRegistryKeySecretName
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: myRegistryKeySecretName
+  - it: should have multiple imagePullSecrets with specified value
+    set:
+      deployment:
+        imagePullSecrets: 
+          - name: myRegistryKeySecretName
+          - name: myOtherRegistryKeySecretName
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: myRegistryKeySecretName
+      - equal:
+          path: spec.template.spec.imagePullSecrets[1].name
+          value: myOtherRegistryKeySecretName
+
