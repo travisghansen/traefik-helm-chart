@@ -94,13 +94,13 @@ tests:
         additionalContainers:
           - image: foo:latest
             name: bar
-      asserts:
-        - equal:
-            path: spec.template.additionalContainers[0].image
-            value: foo:latest
-        - equal:
-            path: spec.template.additionalContainers[0].name
-            value: bar
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: foo:latest
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: bar
   - it: should have additional volumes
     set:
       deployment:
@@ -108,13 +108,29 @@ tests:
           - hostpath:
               path: /foo
             name: bar
-      asserts:
-        - equal:
-            path: spec.template.spec.volumes[4].hostpath.path
-            value: /foo
-        - equal:
-            path: spec.template.spec.volumes[4].name
-            value: bar
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[2].hostpath.path
+          value: /foo
+      - equal:
+          path: spec.template.spec.volumes[2].name
+          value: bar
+  - it: should support secret name with '.' for volumes
+    set:
+      volumes:
+        - name: certs.traefik.io
+          mountPath: "/certs"
+          type: secret
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[2].name
+          value: certs-traefik-io
+      - equal:
+          path: spec.template.spec.volumes[2].secret.secretName
+          value: certs.traefik.io
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[2].name
+          value: certs-traefik-io
   - it: should have imagePullPolicy with specified value
     set:
       image:
@@ -260,19 +276,6 @@ tests:
           path: spec.template.spec.containers[0].args
           content:
             "--certificatesresolvers.myAcmeResolver.acme.tlsChallenge=true"
-  - it: should have the pilot dashboard enabled by default
-    asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].args
-          content: "--pilot.dashboard=false"
-  - it: should have the pilot dashboard disabled
-    set:
-      pilot:
-        dashboard: false
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--pilot.dashboard=false"
   - it: should have prometheus annotations with specified values
     set:
       ports:
@@ -297,7 +300,7 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--metrics.prometheus.addRoutersLabels=true"
-  - it: should have instana tracing enabled
+  - it: should have Instana tracing enabled
     set:
       tracing:
         instana:
@@ -315,20 +318,60 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--tracing.datadog=true"
+  - it: should have Jaeger tracing enabled
+    set:
+      tracing:
+        jaeger:
+          enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--tracing.jaeger=true"
+  - it: should have Zipkin tracing enabled
+    set:
+      tracing:
+        zipkin:
+          enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--tracing.zipkin=true"
+  - it: should have Haystack tracing enabled
+    set:
+      tracing:
+        haystack:
+          enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--tracing.haystack=true"
+  - it: should have Elastic tracing enabled
+    set:
+      tracing:
+        elastic:
+          enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--tracing.elastic=true"
   - it: should not have the http3 experimental flag by default
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].args
           content: "--experimental.http3=true"
-  - it: should have the http3 experimental flag if enabled via values
+  - it: should have the http3 experimental flag and use default entrypoint port when http3 enabled
     set:
-      experimental:
-        http3:
-          enabled: true
+      ports:
+        websecure:
+          http3:
+            enabled: true
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--experimental.http3=true"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entrypoints.websecure.http3"
   - it: should not have http3 config flag by default
     asserts:
       - notContains:
@@ -336,28 +379,15 @@ tests:
           content: "--entrypoints.websecure.enableHTTP3=true"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3.advertisedPort=443"
-  - it: should not have http3 config flag when tls is disabled
-    set:
-      ports:
-        websecure:
-          http3: true
-          tls:
-            enabled: false
-    asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.enableHTTP3=true"
-      - notContains:
-          path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3.advertisedPort=443"
+          content: "--entrypoints.websecure.http3.advertisedPort=8443"
   - it: should have http3 config flag enableHTTP3 when image tag < 2.6.0
     set:
       image:
         tag: 2.5.6
       ports:
         websecure:
-          http3: true
+          http3:
+            enabled: true
           tls:
             enabled: true
     asserts:
@@ -368,10 +398,69 @@ tests:
     set:
       ports:
         websecure:
-          http3: true
+          http3:
+            enabled: true
           tls:
             enabled: true
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3.advertisedPort=443"
+          content: "--entrypoints.websecure.http3"
+  - it: should join entrypoints middleware when there are multiples
+    set:
+      ports:
+        websecure:
+          middlewares:
+            - auth@file
+            - strip@kubernetes-crd
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entrypoints.websecure.http.middlewares=auth@file,strip@kubernetes-crd"
+  - it: should apply middleware on entrypoint
+    set:
+      ports:
+        web:
+          middlewares:
+            - auth@file
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entrypoints.web.http.middlewares=auth@file"
+  - it: should not complain when there are no middlewares on entrypoint
+    set:
+      ports:
+        web:
+          middlewares:
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--entrypoints.web.http.middlewares="
+  - it: should fail when user want to use hostnetwork with hostport != containerport
+    set:
+      hostNetwork: true
+      ports:
+        websecure:
+          port: 443
+          hostPort: 443
+        web:
+          port: 8081
+          hostPort: 81
+    asserts:
+      - failedTemplate:
+          errorMessage: "All hostPort must match their respective containerPort when `hostNetwork` is enabled"
+  - it: should pass when user want to set hostport != containerport without hostNetwork
+    set:
+      hostNetwork: false
+      ports:
+        websecure:
+          port: 443
+          hostPort: 443
+        web:
+          port: 8081
+          hostPort: 81
+    asserts:
+      - isKind:
+          of: Deployment
+      - isAPIVersion:
+          of: apps/v1

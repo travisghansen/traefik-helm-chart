@@ -30,15 +30,16 @@ tests:
           value: RollingUpdate
       - equal:
           path: spec.strategy.rollingUpdate.maxUnavailable
-          value: 1
+          value: 0
       - equal:
           path: spec.strategy.rollingUpdate.maxSurge
           value: 1
   - it: should have a custom merged rollingUpdate strategy with specified values
     set:
-      rollingUpdate:
-        maxUnavailable: 4
-        vegetaForce: 9000
+      updateStrategy:
+        rollingUpdate:
+          maxUnavailable: 4
+          vegetaForce: 9000
     asserts:
       - equal:
           path: spec.strategy.type
@@ -88,3 +89,64 @@ tests:
       - equal:
           path: spec.minReadySeconds
           value: 30
+  - it: should have a preStop hook with specified values
+    set:
+      deployment:
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 40"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 40"]
+  - it: should have a postStart hook with specified values
+    set:
+      deployment:
+        lifecycle:
+          postStart:
+            httpGet:
+              path: /ping
+              port: 9000
+              host: localhost
+              scheme: HTTP
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.postStart.httpGet.path
+          value: /ping
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.postStart.httpGet.port
+          value: 9000
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.postStart.httpGet.host
+          value: localhost
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.postStart.httpGet.scheme
+          value: HTTP
+  - it: should have affinity with specified value
+    values:
+      - ./values/antiaffinity.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey
+          value: kubernetes.io/hostname
+  - it: should have an OnDelete strategy when set
+    set:
+      updateStrategy:
+        type: OnDelete
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: OnDelete
+  - it: should use helm managed namespace as default behavior
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+  - it: should accept overridden namespace
+    set:
+      namespaceOverride: "traefik-ns-override"
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: "traefik-ns-override"

@@ -2,8 +2,8 @@ apiVersion: v2
 name: traefik
 description: A Traefik based Kubernetes ingress controller
 type: application
-version: 10.24.0
-appVersion: 2.8.0
+version: 20.6.0
+appVersion: v2.9.5
 keywords:
   - traefik
   - ingress
@@ -18,4 +18,13 @@ maintainers:
     email: daniel.tomcej@gmail.com
   - name: ldez
     email: ldez@traefik.io
+  - name: mloiseleur
+    email: michel.loiseleur@traefik.io
+  - name: charlie-haley
+    email: charlie.haley@traefik.io
 icon: https://raw.githubusercontent.com/traefik/traefik/v2.3/docs/content/assets/img/traefik.logo.png
+annotations:
+  artifacthub.io/changes: |
+    - "🔍️ Add filePath support on access logs (#747)"
+    - ":bug: Add missing scheme in help on Traefik Hub integration (#746)"
+    - ":memo: Improve documentation on using PVC with TLS certificates"
