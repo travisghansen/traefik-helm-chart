@@ -1,5 +1,334 @@
 # Change Log
 
+## 22.0.0  ![AppVersion: v2.9.9](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.9&color=success&logo=) ![Kubernetes: >=1.16.0-0](https://img.shields.io/static/v1?label=Kubernetes&message=%3E%3D1.16.0-0&color=informational&logo=kubernetes) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2023-03-29
+
+* BREAKING CHANGE: `image.repository` introduction may break during the upgrade. See PR #802.
+
+
+## 21.2.1  ![AppVersion: v2.9.9](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.9&color=success&logo=) ![Kubernetes: >=1.16.0-0](https://img.shields.io/static/v1?label=Kubernetes&message=%3E%3D1.16.0-0&color=informational&logo=kubernetes) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2023-03-28
+
+* ⬆️ Upgrade traefik Docker tag to v2.9.9
+* 🎨 Introduce `image.registry` and add explicit default (it may impact custom `image.repository`)
+* :memo: Clarify the need of an initContainer when enabling persistence for TLS Certificates
+
+### Default value changes
+
+```diff
+diff --git a/traefik/values.yaml b/traefik/values.yaml
+index cadc7a6..4762b77 100644
+--- a/traefik/values.yaml
++++ b/traefik/values.yaml
+@@ -1,5 +1,6 @@
+ # Default values for Traefik
+ image:
++  registry: docker.io
+   repository: traefik
+   # defaults to appVersion
+   tag: ""
+@@ -66,10 +67,14 @@ deployment:
+   # Additional initContainers (e.g. for setting file permission as shown below)
+   initContainers: []
+     # The "volume-permissions" init container is required if you run into permission issues.
+-    # Related issue: https://github.com/traefik/traefik/issues/6825
++    # Related issue: https://github.com/traefik/traefik-helm-chart/issues/396
+     # - name: volume-permissions
+-    #   image: busybox:1.35
+-    #   command: ["sh", "-c", "touch /data/acme.json && chmod -Rv 600 /data/* && chown 65532:65532 /data/acme.json"]
++    #   image: busybox:latest
++    #   command: ["sh", "-c", "touch /data/acme.json; chmod -v 600 /data/acme.json"]
++    #   securityContext:
++    #     runAsNonRoot: true
++    #     runAsGroup: 65532
++    #     runAsUser: 65532
+     #   volumeMounts:
+     #     - name: data
+     #       mountPath: /data
+@@ -849,13 +854,17 @@ securityContext:
+   capabilities:
+     drop: [ALL]
+   readOnlyRootFilesystem: true
++
++podSecurityContext:
++#  # /!\ When setting fsGroup, Kubernetes will recursively changes ownership and
++#  # permissions for the contents of each volume to match the fsGroup. This can
++#  # be an issue when storing sensitive content like TLS Certificates /!\
++#  fsGroup: 65532
++  fsGroupChangePolicy: "OnRootMismatch"
+   runAsGroup: 65532
+   runAsNonRoot: true
+   runAsUser: 65532
+ 
+-podSecurityContext:
+-  fsGroup: 65532
+-
+ #
+ # Extra objects to deploy (value evaluated as a template)
+ #
+```
+
+## 21.2.0  ![AppVersion: v2.9.8](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.8&color=success&logo=) ![Kubernetes: >=1.16.0-0](https://img.shields.io/static/v1?label=Kubernetes&message=%3E%3D1.16.0-0&color=informational&logo=kubernetes) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2023-03-08
+
+* :sparkles: release 21.2.0 (#805)
+* 🚨 Fail when enabling PSP on Kubernetes v1.25+ (#801)
+* Separate UDP hostPort for HTTP/3
+* ⬆️ Upgrade traefik Docker tag to v2.9.8
+
+
+## 21.1.0  ![AppVersion: v2.9.7](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.7&color=success&logo=) ![Kubernetes: >=1.16.0-0](https://img.shields.io/static/v1?label=Kubernetes&message=%3E%3D1.16.0-0&color=informational&logo=kubernetes) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2023-02-15
+
+* ✨ release 21.1.0
+* ⬆️ Upgrade traefik Docker tag to v2.9.7
+* fix: traefik image name for renovate
+* feat: Add volumeName to PersistentVolumeClaim (#792)
+* Allow setting TLS options on dashboard IngressRoute
+
+### Default value changes
+
+```diff
+diff --git a/traefik/values.yaml b/traefik/values.yaml
+index 780b04b..cadc7a6 100644
+--- a/traefik/values.yaml
++++ b/traefik/values.yaml
+@@ -142,6 +142,8 @@ ingressRoute:
+     entryPoints: ["traefik"]
+     # Additional ingressRoute middlewares (e.g. for authentication)
+     middlewares: []
++    # TLS options (e.g. secret containing certificate)
++    tls: {}
+ 
+ # Customize updateStrategy of traefik pods
+ updateStrategy:
+@@ -750,6 +752,7 @@ persistence:
+   accessMode: ReadWriteOnce
+   size: 128Mi
+   # storageClass: ""
++  # volumeName: ""
+   path: /data
+   annotations: {}
+   # subPath: "" # only mount a subpath of the Volume into the pod
+```
+
+## 21.0.0  ![AppVersion: v2.9.6](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.6&color=success&logo=) ![Kubernetes: >=1.16.0-0](https://img.shields.io/static/v1?label=Kubernetes&message=%3E%3D1.16.0-0&color=informational&logo=kubernetes) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2023-02-10
+
+* 💥 New release with BREAKING changes (#786)
+* Configure Renovate (#783)
+* :bug: Disabling dashboard ingressroute should delete it (#785)
+* :boom: Rename image.name => image.repository (#784)
+* :necktie: Improve labels settings behavior on metrics providers (#774)
+* ✨ Chart.yaml - add kubeVersion: ">=1.16.0-0"
+* fix: allowExternalNameServices for kubernetes ingress when hub enabled (#772)
+* 🙈 Add a setting disable API check on Prometheus Operator (#769)
+* 📝 Improve documentation on entrypoint options
+* fix(service-metrics): invert prometheus svc & fullname length checking
+
+### Default value changes
+
+```diff
+diff --git a/traefik/values.yaml b/traefik/values.yaml
+index 42a27f9..780b04b 100644
+--- a/traefik/values.yaml
++++ b/traefik/values.yaml
+@@ -1,6 +1,6 @@
+ # Default values for Traefik
+ image:
+-  name: traefik
++  repository: traefik
+   # defaults to appVersion
+   tag: ""
+   pullPolicy: IfNotPresent
+@@ -396,6 +396,8 @@ metrics:
+   #    enabled: false
+   #    labels: {}
+   #    annotations: {}
++  ## When set to true, it won't check if Prometheus Operator CRDs are deployed
++  #  disableAPICheck: false
+   #  serviceMonitor:
+   #    metricRelabelings: []
+   #      - sourceLabels: [__name__]
+@@ -580,7 +582,7 @@ ports:
+     # hostPort: 8443
+     expose: true
+     exposedPort: 443
+-    # The port protocol (TCP/UDP)
++    ## The port protocol (TCP/UDP)
+     protocol: TCP
+     # nodePort: 32443
+     #
+@@ -594,6 +596,16 @@ ports:
+       enabled: false
+     # advertisedPort: 4443
+     #
++    ## Trust forwarded  headers information (X-Forwarded-*).
++    #forwardedHeaders:
++    #  trustedIPs: []
++    #  insecure: false
++    #
++    ## Enable the Proxy Protocol header parsing for the entry point
++    #proxyProtocol:
++    #  trustedIPs: []
++    #  insecure: false
++    #
+     ## Set TLS at the entrypoint
+     ## https://doc.traefik.io/traefik/routing/entrypoints/#tls
+     tls:
+@@ -607,16 +619,6 @@ ports:
+       #     - foo.example.com
+       #     - bar.example.com
+     #
+-    # Trust forwarded  headers information (X-Forwarded-*).
+-    # forwardedHeaders:
+-    #   trustedIPs: []
+-    #   insecure: false
+-    #
+-    # Enable the Proxy Protocol header parsing for the entry point
+-    # proxyProtocol:
+-    #   trustedIPs: []
+-    #   insecure: false
+-    #
+     # One can apply Middlewares on an entrypoint
+     # https://doc.traefik.io/traefik/middlewares/overview/
+     # https://doc.traefik.io/traefik/routing/entrypoints/#middlewares
+```
+
+## 20.8.0  ![AppVersion: v2.9.6](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.6&color=success&logo=) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2022-12-09
+
+* ✨ update chart to version 20.8.0
+* ✨ add support for default entrypoints
+* ✨ add support for OpenTelemetry and Traefik v3
+
+### Default value changes
+
+```diff
+diff --git a/traefik/values.yaml b/traefik/values.yaml
+index b77539d..42a27f9 100644
+--- a/traefik/values.yaml
++++ b/traefik/values.yaml
+@@ -107,6 +107,8 @@ ingressClass:
+ 
+ # Enable experimental features
+ experimental:
++  v3:
++    enabled: false
+   plugins:
+     enabled: false
+   kubernetesGateway:
+@@ -347,7 +349,43 @@ metrics:
+ #    # addRoutersLabels: true
+ #    ## Enable metrics on services. Default=true
+ #    # addServicesLabels: false
+-
++#  openTelemetry:
++#    ## Address of the OpenTelemetry Collector to send metrics to.
++#    address: "localhost:4318"
++#    ## Enable metrics on entry points.
++#    addEntryPointsLabels: true
++#    ## Enable metrics on routers.
++#    addRoutersLabels: true
++#    ## Enable metrics on services.
++#    addServicesLabels: true
++#    ## Explicit boundaries for Histogram data points.
++#    explicitBoundaries:
++#      - "0.1"
++#      - "0.3"
++#      - "1.2"
++#      - "5.0"
++#    ## Additional headers sent with metrics by the reporter to the OpenTelemetry Collector.
++#    headers:
++#      foo: bar
++#      test: test
++#    ## Allows reporter to send metrics to the OpenTelemetry Collector without using a secured protocol.
++#    insecure: true
++#    ## Interval at which metrics are sent to the OpenTelemetry Collector.
++#    pushInterval: 10s
++#    ## Allows to override the default URL path used for sending metrics. This option has no effect when using gRPC transport.
++#    path: /foo/v1/traces
++#    ## Defines the TLS configuration used by the reporter to send metrics to the OpenTelemetry Collector.
++#    tls:
++#      ## The path to the certificate authority, it defaults to the system bundle.
++#      ca: path/to/ca.crt
++#      ## The path to the public certificate. When using this option, setting the key option is required.
++#      cert: path/to/foo.cert
++#      ## The path to the private key. When using this option, setting the cert option is required.
++#      key: path/to/key.key
++#      ## If set to true, the TLS connection accepts any certificate presented by the server regardless of the hostnames it covers.
++#      insecureSkipVerify: true
++#    ## This instructs the reporter to send metrics to the OpenTelemetry Collector using gRPC.
++#    grpc: true
+ 
+ ##
+ ##  enable optional CRDs for Prometheus Operator
+@@ -510,6 +548,8 @@ ports:
+     # The port protocol (TCP/UDP)
+     protocol: TCP
+   web:
++    ## Enable this entrypoint as a default entrypoint. When a service doesn't explicity set an entrypoint it will only use this entrypoint.
++    # asDefault: true
+     port: 8000
+     # hostPort: 8000
+     expose: true
+@@ -534,6 +574,8 @@ ports:
+     #   trustedIPs: []
+     #   insecure: false
+   websecure:
++    ## Enable this entrypoint as a default entrypoint. When a service doesn't explicity set an entrypoint it will only use this entrypoint.
++    # asDefault: true
+     port: 8443
+     # hostPort: 8443
+     expose: true
+```
+
+## 20.7.0  ![AppVersion: v2.9.6](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.6&color=success&logo=) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
+
+**Release date:** 2022-12-08
+
+* ⬆️  Update default Traefik release to v2.9.6 (#758)
+* 🐛 Don't fail when prometheus is disabled (#756)
+* :bug: Fix typo on bufferingSize for access logs (#753)
+* ✨ support for Gateway annotations
+* add keywords [networking], for artifacthub category quering
+* :adhesive_bandage: Add quotes for artifacthub changelog parsing (#748)
+
+### Default value changes
+
+```diff
+diff --git a/traefik/values.yaml b/traefik/values.yaml
+index 4f2fb2a..b77539d 100644
+--- a/traefik/values.yaml
++++ b/traefik/values.yaml
+@@ -120,6 +120,9 @@ experimental:
+     # By default, Gateway would be created to the Namespace you are deploying Traefik to.
+     # You may create that Gateway in another namespace, setting its name below:
+     # namespace: default
++    # Additional gateway annotations (e.g. for cert-manager.io/issuer)
++    # annotations:
++    #   cert-manager.io/issuer: letsencrypt
+ 
+ # Create an IngressRoute for the dashboard
+ ingressRoute:
+@@ -219,7 +222,8 @@ logs:
+     # By default, the logs use a text format (common), but you can
+     # also ask for the json format in the format option
+     # format: json
+-    # By default, the level is set to ERROR. Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
++    # By default, the level is set to ERROR.
++    # Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+     level: ERROR
+   access:
+     # To enable access logs
+```
+
 ## 20.6.0  ![AppVersion: v2.9.5](https://img.shields.io/static/v1?label=AppVersion&message=v2.9.5&color=success&logo=) ![Helm: v3](https://img.shields.io/static/v1?label=Helm&message=v3&color=informational&logo=helm)
 
 **Release date:** 2022-11-30
