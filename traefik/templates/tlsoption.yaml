@@ -1,5 +1,5 @@
 {{- range $name, $config := .Values.tlsOptions }}
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: TLSOption
 metadata:
   name: {{ $name }}
@@ -12,19 +12,19 @@ metadata:
 spec:
   {{- with $config.alpnProtocols }}
   alpnProtocols:
-  {{- toYaml . | nindent 6 }}
+  {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with $config.cipherSuites }}
   cipherSuites:
-  {{- toYaml . | nindent 6 }}
+  {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with $config.clientAuth }}
   clientAuth:
-  {{- toYaml . | nindent 6 }}
+  {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with $config.curvePreferences }}
   curvePreferences:
-  {{- toYaml . | nindent 6 }}
+  {{- toYaml . | nindent 4 }}
   {{- end }}  
   {{- if $config.maxVersion }}
   maxVersion: {{ $config.maxVersion }}

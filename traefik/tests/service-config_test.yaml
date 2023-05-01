@@ -37,6 +37,10 @@ tests:
       - equal:
           path: metadata.labels.custom-label
           value: custom-value
+  - it: should have no load balancer class by default
+    asserts:
+      - isNull:
+          path: spec.loadBalancerClass
   - it: should have custom spec elements when specified via values
     set:
       service:
@@ -44,6 +48,7 @@ tests:
           externalTrafficPolicy: Cluster
           loadBalancerIP: "1.2.3.4"
           clusterIP: "2.3.4.5"
+          loadBalancerClass: myclass
           loadBalancerSourceRanges:
             - 192.168.0.1/32
             - 172.16.0.0/16
@@ -75,6 +80,9 @@ tests:
       - equal:
           path: spec.externalIPs[0]
           value: "1.2.3.4"
+      - equal:
+          path: spec.loadBalancerClass
+          value: myclass
   - it: should have custom spec elements when specified via values for TCP ports
     set:
       ports:
@@ -128,7 +136,7 @@ tests:
           port: 3000
           protocol: UDP
     asserts:
-      - isEmpty:
+      - isNull:
           path: spec.ipFamilyPolicy
         documentIndex: 0
   - it: should have custom ipFamilyPolicy when specified via values
@@ -151,7 +159,7 @@ tests:
           port: 3000
           protocol: UDP
     asserts:
-      - isEmpty:
+      - isNull:
           path: spec.ipFamilies
         documentIndex: 0
   - it: should have custom ipFamilies when specified via values
@@ -280,3 +288,30 @@ tests:
       - equal:
           path: metadata.namespace
           value: "traefik-ns-override"
+  - it: should have different target port when targetPort is different from port
+    set:
+      ports:
+        web:
+          port: 8080
+          exposedPort: 80
+          expose: true
+          targetPort: 80
+        websecure:
+          port: 443
+          exposedPort: 443
+          expose: true
+          targetPort: 80
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 80
+      - equal:
+          path: spec.ports[1].port
+          value: 443
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 80
