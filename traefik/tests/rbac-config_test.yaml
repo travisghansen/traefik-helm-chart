@@ -175,6 +175,148 @@ tests:
           path: metadata.namespace
           value: NAMESPACE
         template: rbac/serviceaccount.yaml
+  - it: should use multiple namespaces if provided to kubernetesCRD
+    set:
+      providers:
+        kubernetesCRD:
+          namespaces:
+            - default
+            - foo
+      rbac:
+        namespaced: true
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: rbac/role.yaml
+      - hasDocuments:
+          count: 3
+        template: rbac/rolebinding.yaml
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+        template: rbac/role.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: default
+        template: rbac/role.yaml
+        documentIndex: 1
+      - equal:
+          path: metadata.namespace
+          value: foo
+        template: rbac/role.yaml
+        documentIndex: 2
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+        template: rbac/rolebinding.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: default
+        template: rbac/rolebinding.yaml
+        documentIndex: 1
+      - equal:
+          path: metadata.namespace
+          value: foo
+        template: rbac/rolebinding.yaml
+        documentIndex: 2
+  - it: should use multiple namespaces if provided to kubernetesIngress
+    set:
+      providers:
+        kubernetesIngress:
+          namespaces:
+            - default
+            - bar
+      rbac:
+        namespaced: true
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: rbac/role.yaml
+      - hasDocuments:
+          count: 3
+        template: rbac/rolebinding.yaml
+      - equal:
+          path: metadata.namespace
+          value: default
+        template: rbac/role.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: bar
+        template: rbac/role.yaml
+        documentIndex: 1
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+        template: rbac/role.yaml
+        documentIndex: 2
+      - equal:
+          path: metadata.namespace
+          value: default
+        template: rbac/rolebinding.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: bar
+        template: rbac/rolebinding.yaml
+        documentIndex: 1
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+        template: rbac/rolebinding.yaml
+        documentIndex: 2
+  - it: should use multiple namespaces if provided to both providers
+    set:
+      providers:
+        kubernetesCRD:
+          namespaces:
+            - default
+            - foo
+        kubernetesIngress:
+          namespaces:
+            - default
+            - bar
+      rbac:
+        namespaced: true
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: rbac/role.yaml
+      - hasDocuments:
+          count: 3
+        template: rbac/rolebinding.yaml
+      - equal:
+          path: metadata.namespace
+          value: default
+        template: rbac/role.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: bar
+        template: rbac/role.yaml
+        documentIndex: 1
+      - equal:
+          path: metadata.namespace
+          value: foo
+        template: rbac/role.yaml
+        documentIndex: 2
+      - equal:
+          path: metadata.namespace
+          value: default
+        template: rbac/rolebinding.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: bar
+        template: rbac/rolebinding.yaml
+        documentIndex: 1
+      - equal:
+          path: metadata.namespace
+          value: foo
+        template: rbac/rolebinding.yaml
+        documentIndex: 2
   - it: should accept overridden namespace
     set:
       namespaceOverride: "traefik-ns-override"
@@ -251,6 +393,32 @@ tests:
               - get
               - list
               - watch
+  - it: cluster rbac should be only on traefik.io for v3
+    set:
+      image:
+        tag: v3.0.0-beta3
+    asserts:
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - traefik.io
+            resources:
+              - ingressroutes
+              - ingressroutetcps
+              - ingressrouteudps
+              - middlewares
+              - middlewaretcps
+              - tlsoptions
+              - tlsstores
+              - traefikservices
+              - serverstransports
+              - serverstransporttcps
+            verbs:
+              - get
+              - list
+              - watch
   - it: namespaced rbac should be on both traefik.io and containo.us API group
     set:
       rbac:
@@ -273,6 +441,34 @@ tests:
               - tlsstores
               - traefikservices
               - serverstransports
+            verbs:
+              - get
+              - list
+              - watch
+  - it: namespaced rbac should be only on traefik.io API group for v3
+    set:
+      rbac:
+        namespaced: true
+      image:
+        tag: v3.0.0-beta3
+    asserts:
+      - template: rbac/role.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - traefik.io
+            resources:
+              - ingressroutes
+              - ingressroutetcps
+              - ingressrouteudps
+              - middlewares
+              - middlewaretcps
+              - tlsoptions
+              - tlsstores
+              - traefikservices
+              - serverstransports
+              - serverstransporttcps
             verbs:
               - get
               - list

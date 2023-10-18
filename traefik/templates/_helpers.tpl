@@ -58,8 +58,8 @@ app.kubernetes.io/instance: {{ template "traefik.instance-name" . }}
 {{ include "traefik.labelselector" . }}
 helm.sh/chart: {{ template "traefik.chart" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- if .Values.commonLabels }}
-{{ toYaml .Values.commonLabels }}
+{{- with .Values.commonLabels }}
+{{ toYaml . }}
 {{- end }}
 {{- end }}
 
@@ -108,10 +108,10 @@ Users can provide an override for an explicit service they want bound via `.Valu
 Construct a comma-separated list of whitelisted namespaces
 */}}
 {{- define "providers.kubernetesIngress.namespaces" -}}
-{{- default .Release.Namespace (join "," .Values.providers.kubernetesIngress.namespaces) }}
+{{- default (include "traefik.namespace" .) (join "," .Values.providers.kubernetesIngress.namespaces) }}
 {{- end -}}
 {{- define "providers.kubernetesCRD.namespaces" -}}
-{{- default .Release.Namespace (join "," .Values.providers.kubernetesCRD.namespaces) }}
+{{- default (include "traefik.namespace" .) (join "," .Values.providers.kubernetesCRD.namespaces) }}
 {{- end -}}
 
 {{/*
@@ -124,3 +124,8 @@ Renders a complete tree, even values that contains template.
     {{- tpl (.value | toYaml) .context }}
   {{- end }}
 {{- end -}}
+
+{{- define "imageVersion" -}}
+{{ (split "@" (default $.Chart.AppVersion $.Values.image.tag))._0 }}
+{{- end -}}
+

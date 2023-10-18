@@ -17,7 +17,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -30,6 +30,7 @@ jobs:
       - name: Copy LICENSE and README.md for packaging
         run: |
           cp ./README.md ./traefik/README.md
+          cp ./EXAMPLES.md ./traefik/EXAMPLES.md
           cp ./LICENSE ./traefik/LICENSE
 
       - name: Generate default static install

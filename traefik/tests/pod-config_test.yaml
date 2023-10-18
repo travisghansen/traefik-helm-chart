@@ -5,6 +5,28 @@ capabilities:
   majorVersion: 1
   minorVersion: 16
 tests:
+  - it: should have env with specified values
+    set:
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_TEST
+          value: powpow
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: POD_NAME
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.fieldRef.fieldPath
+          value: metadata.name
+      - equal:
+          path: spec.template.spec.containers[0].env[1].name
+          value: POD_TEST
+      - equal:
+          path: spec.template.spec.containers[0].env[1].value
+          value: powpow
   - it: should have envFrom with specified values
     set:
       envFrom:
@@ -31,6 +53,7 @@ tests:
       podSecurityContext:
         readOnlyRootFilesystem: false
       securityContext:
+        allowPrivilegeEscalation: true
         runAsUser: 1000
     asserts:
       - equal:
@@ -38,6 +61,9 @@ tests:
           value: false
       - equal:
           path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
           value: true
       - equal:
           path: spec.template.spec.containers[0].securityContext.runAsUser
@@ -372,6 +398,21 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--entrypoints.websecure.http3"
+  - it: should use default entrypoint port without experimental flag when http3 enabled on v3
+    set:
+      image:
+        tag: v3.0.0-beta3
+      ports:
+        websecure:
+          http3:
+            enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--experimental.http3=true"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entrypoints.websecure.http3"
   - it: should not have http3 config flag by default
     asserts:
       - notContains:
@@ -448,7 +489,7 @@ tests:
           hostPort: 81
     asserts:
       - failedTemplate:
-          errorMessage: "All hostPort must match their respective containerPort when `hostNetwork` is enabled"
+          errorMessage: "ERROR: All hostPort must match their respective containerPort when `hostNetwork` is enabled"
   - it: should pass when user want to set hostport != containerport without hostNetwork
     set:
       hostNetwork: false
@@ -572,3 +613,12 @@ tests:
       - equal:
           path: spec.template.spec.dnsConfig.options[1].name
           value: "edns0"
+  - it: should not have prometheus annotations
+    set:
+      metrics:
+        prometheus:
+          serviceMonitor:
+            jobLabel: traefik
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations.prometheus.io/scrape

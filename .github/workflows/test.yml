@@ -11,9 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Checkout master
+        run: git checkout master && git checkout - && git rev-parse HEAD
 
       - name: Configure Git
         run: |
@@ -24,3 +27,13 @@ jobs:
 
       - name: Test
         run: make test
+
+      - name: Track docs
+        run: |
+          if ! [ -z "$(git diff traefik/Chart.yaml | grep version:)" ]; then
+            make docs
+            if ! [ -z "$(git status | grep traefik/VALUES.md)" ]; then
+            echo "Traefik values have changed. Run make docs"
+            exit 1
+            fi
+          fi
