@@ -168,11 +168,13 @@ tests:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesingress.ingressClass=foo"
 
-  - it: should have a plugin storage if the experimental feature is enabled
+  - it: should have a plugin storage and args if the experimental feature is enabled
     set:
       experimental:
         plugins:
-          enabled: true
+          demo:
+            moduleName: github.com/traefik/plugindemo
+            version: v0.2.1
     asserts:
       - equal:
           path: spec.template.spec.volumes[2]
@@ -184,6 +186,39 @@ tests:
           content:
             name: plugins
             mountPath: "/plugins-storage"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--experimental.plugins.demo.moduleName=github.com/traefik/plugindemo"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--experimental.plugins.demo.version=v0.2.1"
+
+  - it: should fail gracefully when using old syntax
+    set:
+      experimental:
+        plugins:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: plugin enabled is missing moduleName/version keys !"
+
+  - it: should fail gracefully on missing plugins information
+    set:
+      experimental:
+        plugins:
+          demo:
+            moduleName: github.com/traefik/plugindemo
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: plugin demo is missing moduleName/version keys !"
+
+  - it: should fail gracefully on bad structure
+    set:
+      experimental:
+        plugins: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: .Values.experimental.plugins should be a map (bool provided) !"
 
   - it: should have tls configuration args when specified in values.yaml for port
     set:
@@ -201,19 +236,19 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls=true"
+          content: "--entryPoints.websecure.http.tls=true"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls.options=foo"
+          content: "--entryPoints.websecure.http.tls.options=foo"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls.certResolver=certResolverFoo"
+          content: "--entryPoints.websecure.http.tls.certResolver=certResolverFoo"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls.domains[0].main=sub.domain.tld"
+          content: "--entryPoints.websecure.http.tls.domains[0].main=sub.domain.tld"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls.domains[0].sans=alt1.domain.tld,alt2.domain.tld"
+          content: "--entryPoints.websecure.http.tls.domains[0].sans=alt1.domain.tld,alt2.domain.tld"
 
   - it: should have additional volumeMounts
     set:
@@ -244,11 +279,17 @@ tests:
           path: spec.template.spec.containers[0].livenessProbe.httpGet.port
           value: 9001
       - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: "/ping"
+      - equal:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.port
           value: 9001
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.scheme
           value: "HTTP"
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: "/ping"
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--ping"
@@ -283,11 +324,25 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--ping.entrypoint=websecure"
+  - it: should set custom probe paths
+    set:
+      additionalArguments:
+        - --ping
+      deployment:
+        readinessPath: /ready
+        livenessPath: /alive
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /alive
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
   - it: should enable tls on websecure entrypoints by default
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls=true"
+          content: "--entryPoints.websecure.http.tls=true"
   - it: should be possible to disable tls on websecure entrypoint
     set:
       ports:
@@ -297,7 +352,7 @@ tests:
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.tls=true"
+          content: "--entryPoints.websecure.http.tls=true"
   - it: should allow to set namespace on providers by default, without rbac.namespaced
     set:
       rbac:
@@ -348,28 +403,28 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.forwardedHeaders.trustedIPs=127.0.0.1/32,192.168.1.7"
+          content: "--entryPoints.websecure.forwardedHeaders.trustedIPs=127.0.0.1/32,192.168.1.7"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.proxyProtocol.trustedIPs=127.0.0.1/32,192.168.1.8"
+          content: "--entryPoints.websecure.proxyProtocol.trustedIPs=127.0.0.1/32,192.168.1.8"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.forwardedHeaders.insecure"
+          content: "--entryPoints.websecure.forwardedHeaders.insecure"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.proxyProtocol.insecure"
+          content: "--entryPoints.websecure.proxyProtocol.insecure"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,192.168.1.9"
+          content: "--entryPoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,192.168.1.9"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.web.proxyProtocol.trustedIPs=127.0.0.1/32,192.168.1.10"
+          content: "--entryPoints.web.proxyProtocol.trustedIPs=127.0.0.1/32,192.168.1.10"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.web.forwardedHeaders.insecure"
+          content: "--entryPoints.web.forwardedHeaders.insecure"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.web.proxyProtocol.insecure"
+          content: "--entryPoints.web.proxyProtocol.insecure"
   - it: should have forwardedHeaders and proxyProtocol insecure configuration args when specified in values.yaml for port
     set:
       ports:
@@ -383,10 +438,57 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.forwardedHeaders.insecure"
+          content: "--entryPoints.websecure.forwardedHeaders.insecure"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.proxyProtocol.insecure"
+          content: "--entryPoints.websecure.proxyProtocol.insecure"
+  - it: should have multiple transport configuration args when specified in values.yaml for port
+    set:
+      ports:
+        websecure:
+          transport:
+            respondingTimeouts:
+              readTimeout: 60
+              writeTimeout: 0
+              idleTimeout: 180
+            lifeCycle:
+              requestAcceptGraceTimeout: 0
+              graceTimeOut: 10
+            keepAliveMaxRequests: 0
+            keepAliveMaxTime: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=60"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.lifeCycle.requestAcceptGraceTimeout=0"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.lifeCycle.graceTimeOut=10"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.keepAliveMaxRequests=0"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.keepAliveMaxTime=0"
+  - it: should have a single transport configuration arg when specified in values.yaml for port
+    set:
+      ports:
+        websecure:
+          transport:
+            respondingTimeouts:
+              readTimeout: 42s
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=42s"
   - it: should be possible to configure access logs
     set:
       logs:
@@ -395,6 +497,9 @@ tests:
           format: json
           filePath: "/data/log"
           bufferingSize: 100
+          addInternals: true
+          filters:
+            statuscodes: "200,300-302"
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -408,3 +513,41 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--accesslog.bufferingsize=100"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--accesslog.addinternals"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--accesslog.filters.statuscodes=200,300-302"
+  - it: should set custom startupProbe
+    set:
+      startupProbe:
+        exec:
+          command:
+            - mycommand
+            - foo
+        initialDelaySeconds: 5
+        periodSeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.exec.command
+          value: ["mycommand", "foo"]
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.initialDelaySeconds
+          value: 5
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.periodSeconds
+          value: 5
+  - it: should set disableIngressClassLookup if version is v3 and disableIngressClassLookup is true
+    set:
+      rbac:
+        namespaced: true
+      providers:
+        kubernetesIngress:
+          disableIngressClassLookup: true
+      image:
+        tag: v3.0.0-beta3
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.disableIngressClassLookup=true"

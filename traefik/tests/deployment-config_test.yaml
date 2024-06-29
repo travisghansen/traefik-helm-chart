@@ -2,11 +2,26 @@ suite: Deployment configuration
 templates:
   - deployment.yaml
 tests:
-  - it: should have 1 replica by default
+  - it: should provide expected defaults
     asserts:
       - equal:
           path: spec.replicas
           value: 1
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
   - it: should have the specified amount of replicas when specified via values
     set:
       deployment:
@@ -22,17 +37,6 @@ tests:
     asserts:
       - equal:
           path: spec.revisionHistoryLimit
-          value: 1
-  - it: should have a rollingUpdate strategy with default values
-    asserts:
-      - equal:
-          path: spec.strategy.type
-          value: RollingUpdate
-      - equal:
-          path: spec.strategy.rollingUpdate.maxUnavailable
-          value: 0
-      - equal:
-          path: spec.strategy.rollingUpdate.maxSurge
           value: 1
   - it: should have a custom merged rollingUpdate strategy with specified values
     set:
@@ -67,6 +71,28 @@ tests:
       - equal:
           path: spec.template.metadata.annotations.traefik/powpow
           value: podAnnotations
+  - it: should have podAnnotations with specified values
+    set:
+      type: 'internal'
+      deployment:
+        podAnnotations:
+          traefik/powpow: podAnnotations
+          traefik/name: '{{ template "traefik.name" . }}'
+          traefik/{{ template "traefik.name" . }}.logs: 'log_processing_rules'
+          traefik/type: '{{ .Values.type }}'
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.traefik/powpow
+          value: podAnnotations
+      - equal:
+          path: spec.template.metadata.annotations.traefik/name
+          value: 'traefik'
+      - equal:
+          path: spec.template.metadata.annotations["traefik/traefik.logs"]
+          value: 'log_processing_rules'
+      - equal:
+          path: spec.template.metadata.annotations.traefik/type
+          value: 'internal'
   - it: should have labels with specified values
     set:
       deployment:
@@ -138,11 +164,6 @@ tests:
       - equal:
           path: spec.strategy.type
           value: OnDelete
-  - it: should use helm managed namespace as default behavior
-    asserts:
-      - equal:
-          path: metadata.namespace
-          value: NAMESPACE
   - it: should accept overridden namespace
     set:
       namespaceOverride: "traefik-ns-override"
@@ -150,17 +171,54 @@ tests:
       - equal:
           path: metadata.namespace
           value: "traefik-ns-override"
-  - it: should have http3 enabled, when enabled with advertisedPort
+  - it: should fail when using previous syntax
     set:
       ports:
+        web:
+          redirectTo: websecure
         websecure:
-          http3:
-            advertisedPort: 443
-            enabled: true
+          exposedPort: 443
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: Syntax of `ports.web.redirectTo` has changed to `ports.web.redirectTo.port`. Details in PR #934."
+  - it: should have http redirections enabled, when enabled with redirectTo
+    set:
+      ports:
+        web:
+          redirectTo:
+            port: websecure
+        websecure:
+          exposedPort: 443
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3"
+          content: "--entryPoints.web.http.redirections.entryPoint.to=:443"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3.advertisedPort=443"
+          content: "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+  - it: should have http redirections enabled, when enabled with redirectTo and priority
+    set:
+      ports:
+        web:
+          redirectTo:
+            port: websecure
+            priority: 10
+        websecure:
+          exposedPort: 443
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.web.http.redirections.entryPoint.priority=10"
+  - it: should have permanent http redirections enabled, when enabled with redirectTo and permanent
+    set:
+      ports:
+        web:
+          redirectTo:
+            port: websecure
+            permanent: true
+        websecure:
+          exposedPort: 443
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.web.http.redirections.entryPoint.permanent=true"

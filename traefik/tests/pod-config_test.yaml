@@ -5,6 +5,46 @@ capabilities:
   majorVersion: 1
   minorVersion: 16
 tests:
+  - it: should have set GOMAXPROCS with cpu limit
+    set:
+      resources:
+        limits:
+          cpu: "4"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: GOMAXPROCS
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.resource
+          value: limits.cpu
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.divisor
+          value: "1"
+  - it: should have set GOMEMLIMIT with cpu limit
+    set:
+      resources:
+        limits:
+          memory: "4"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: GOMEMLIMIT
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.resource
+          value: limits.memory
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.divisor
+          value: "1"
+  - it: should have not set GOMAXPROCS without cpu limit
+    asserts:
+      - notEqual:
+          path: spec.template.spec.containers[0].env[0].name
+          value: GOMAXPROCS
+  - it: should have not set GOMEMLIMIT without cpu limit
+    asserts:
+      - notEqual:
+          path: spec.template.spec.containers[0].env[0].name
+          value: GOMEMLIMIT
   - it: should have env with specified values
     set:
       env:
@@ -288,20 +328,16 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content:
-            "--certificatesresolvers.myAcmeResolver.acme.email=email@example.com"
+          content: "--certificatesresolvers.myAcmeResolver.acme.email=email@example.com"
       - contains:
           path: spec.template.spec.containers[0].args
-          content:
-            "--certificatesresolvers.myAcmeResolver.acme.dnsChallenge.provider=myProvider"
+          content: "--certificatesresolvers.myAcmeResolver.acme.dnsChallenge.provider=myProvider"
       - contains:
           path: spec.template.spec.containers[0].args
-          content:
-            "--certificatesresolvers.myAcmeResolver.acme.dnsChallenge.resolvers=1.1.1.1,8.8.8.8"
+          content: "--certificatesresolvers.myAcmeResolver.acme.dnsChallenge.resolvers=1.1.1.1,8.8.8.8"
       - contains:
           path: spec.template.spec.containers[0].args
-          content:
-            "--certificatesresolvers.myAcmeResolver.acme.tlsChallenge=true"
+          content: "--certificatesresolvers.myAcmeResolver.acme.tlsChallenge=true"
   - it: should have prometheus annotations with specified values
     set:
       ports:
@@ -326,66 +362,21 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--metrics.prometheus.addRoutersLabels=true"
-  - it: should have Instana tracing enabled
+  - it: should have http3 enabled, when enabled with advertisedPort
     set:
-      tracing:
-        instana:
-          enabled: true
+      ports:
+        websecure:
+          http3:
+            advertisedPort: 443
+            enabled: true
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--tracing.instana=true"
-  - it: should have datadog tracing enabled
-    set:
-      tracing:
-        datadog:
-          enabled: true
-    asserts:
+          content: "--entryPoints.websecure.http3"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--tracing.datadog=true"
-  - it: should have Jaeger tracing enabled
-    set:
-      tracing:
-        jaeger:
-          enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--tracing.jaeger=true"
-  - it: should have Zipkin tracing enabled
-    set:
-      tracing:
-        zipkin:
-          enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--tracing.zipkin=true"
-  - it: should have Haystack tracing enabled
-    set:
-      tracing:
-        haystack:
-          enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--tracing.haystack=true"
-  - it: should have Elastic tracing enabled
-    set:
-      tracing:
-        elastic:
-          enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--tracing.elastic=true"
-  - it: should not have the http3 experimental flag by default
-    asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].args
-          content: "--experimental.http3=true"
-  - it: should have the http3 experimental flag and use default entrypoint port when http3 enabled
+          content: "--entryPoints.websecure.http3.advertisedPort=443"
+  - it: should be possible to enable http3 enabled without a custom advertisedPort
     set:
       ports:
         websecure:
@@ -394,59 +385,19 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--experimental.http3=true"
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3"
-  - it: should use default entrypoint port without experimental flag when http3 enabled on v3
-    set:
-      image:
-        tag: v3.0.0-beta3
-      ports:
-        websecure:
-          http3:
-            enabled: true
-    asserts:
+          content: "--entryPoints.websecure.http3"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--experimental.http3=true"
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3"
+          content: "--entryPoints.websecure.http3.advertisedPort=443"
+
   - it: should not have http3 config flag by default
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.enableHTTP3=true"
+          content: "--entryPoints.websecure.http3"
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3.advertisedPort=8443"
-  - it: should have http3 config flag enableHTTP3 when image tag < 2.6.0
-    set:
-      image:
-        tag: 2.5.6
-      ports:
-        websecure:
-          http3:
-            enabled: true
-          tls:
-            enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.enableHTTP3=true"
-  - it: should have http3 config flag advertisedPort when image tag >= 2.6.0
-    set:
-      ports:
-        websecure:
-          http3:
-            enabled: true
-          tls:
-            enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http3"
+          content: "--entryPoints.websecure.http3.advertisedPort=8443"
   - it: should join entrypoints middleware when there are multiples
     set:
       ports:
@@ -457,7 +408,7 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.websecure.http.middlewares=auth@file,strip@kubernetes-crd"
+          content: "--entryPoints.websecure.http.middlewares=auth@file,strip@kubernetes-crd"
   - it: should apply middleware on entrypoint
     set:
       ports:
@@ -467,7 +418,7 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.web.http.middlewares=auth@file"
+          content: "--entryPoints.web.http.middlewares=auth@file"
   - it: should not complain when there are no middlewares on entrypoint
     set:
       ports:
@@ -476,7 +427,7 @@ tests:
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].args
-          content: "--entrypoints.web.http.middlewares="
+          content: "--entryPoints.web.http.middlewares="
   - it: should fail when user want to use hostnetwork with hostport != containerport
     set:
       hostNetwork: true
@@ -505,7 +456,7 @@ tests:
           of: Deployment
       - isAPIVersion:
           of: apps/v1
-  - it: should have only one http3 port when not using hostport
+  - it: should have two http3 port when not using hostport
     set:
       ports:
         websecure:
@@ -514,15 +465,17 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].ports
-          any: true
-          count: 1
           content:
             containerPort: 8443
-      - notContains:
+            name: websecure
+            protocol: TCP
+      - contains:
           path: spec.template.spec.containers[0].ports
           content:
+            containerPort: 8443
             name: websecure-http3
-  - it: should have two separate http3 port when using hostport
+            protocol: UDP
+  - it: should be possible to use hostport with http3
     set:
       ports:
         websecure:
@@ -622,3 +575,31 @@ tests:
     asserts:
       - isNull:
           path: spec.template.metadata.annotations.prometheus.io/scrape
+  - it: should set runtimeClassName when configured
+    set:
+      deployment:
+        runtimeClassName: ArbitraryRuntimeClass
+    asserts:
+      - equal:
+          path: spec.template.spec.runtimeClassName
+          value: ArbitraryRuntimeClass
+  - it: should not set runtimeClassName when configured
+    set:
+      deployment:
+        runtimeClassName:
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].runtimeClassName
+  - it: should set runtimeClassName when configured
+    set:
+      core:
+        defaultRuleSyntax: v2
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--core.defaultRuleSyntax=v2"
+  - it: should not set defaultRuleSyntax by default
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--core.defaultRuleSyntax=v2"

@@ -8,6 +8,9 @@ tests:
         kubernetesGateway:
           enabled: true
     asserts:
+      - containsDocument:
+          kind: Gateway
+          apiVersion: gateway.networking.k8s.io/v1
       - equal:
           path: spec.gatewayClassName
           value: "traefik"
@@ -17,7 +20,7 @@ tests:
       - equal:
           path: metadata.namespace
           value: "NAMESPACE"
-  - it: should configure allowedRoutes within web listener
+  - it: should configure namespacePolicy within web listener
     set:
       experimental:
         kubernetesGateway:
@@ -27,6 +30,31 @@ tests:
       - equal:
           path: spec.listeners[0].allowedRoutes.namespaces.from
           value: "All"
+  - it: should configure namespacePolicy within websecure listener
+    set:
+      experimental:
+        kubernetesGateway:
+          enabled: true
+          namespacePolicy: All
+          certificate:
+            group: "core"
+            kind: "Secret"
+            name: "mysecret"
+    asserts:
+      - equal:
+          path: spec.listeners[1].allowedRoutes.namespaces.from
+          value: "All"
+  - it: should set expected apiVersion with v3 version
+    set:
+      image:
+        tag: 3.0.0-beta4
+      experimental:
+        kubernetesGateway:
+          enabled: true
+    asserts:
+      - containsDocument:
+          kind: Gateway
+          apiVersion: gateway.networking.k8s.io/v1alpha2
   - it: should have one Gateway with the correct class and an http port as well as an https port
     set:
       experimental:
