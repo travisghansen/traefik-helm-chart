@@ -5,7 +5,7 @@
         {{- tpl (toYaml .Values.deployment.podAnnotations) . | nindent 8 }}
       {{- end }}
       {{- if .Values.metrics }}
-      {{- if and (.Values.metrics.prometheus) (not .Values.metrics.prometheus.serviceMonitor) }}
+      {{- if and (.Values.metrics.prometheus) (not (.Values.metrics.prometheus.serviceMonitor).enabled) }}
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
         prometheus.io/port: {{ quote (index .Values.ports .Values.metrics.prometheus.entryPoint).port }}
@@ -449,51 +449,70 @@
           {{- end }}
           {{- if .Values.providers.kubernetesCRD.enabled }}
           - "--providers.kubernetescrd"
-          {{- if .Values.providers.kubernetesCRD.labelSelector }}
+           {{- if .Values.providers.kubernetesCRD.labelSelector }}
           - "--providers.kubernetescrd.labelSelector={{ .Values.providers.kubernetesCRD.labelSelector }}"
-          {{- end }}
-          {{- if .Values.providers.kubernetesCRD.ingressClass }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesCRD.ingressClass }}
           - "--providers.kubernetescrd.ingressClass={{ .Values.providers.kubernetesCRD.ingressClass }}"
-          {{- end }}
-          {{- if .Values.providers.kubernetesCRD.allowCrossNamespace }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesCRD.allowCrossNamespace }}
           - "--providers.kubernetescrd.allowCrossNamespace=true"
-          {{- end }}
-          {{- if .Values.providers.kubernetesCRD.allowExternalNameServices }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesCRD.allowExternalNameServices }}
           - "--providers.kubernetescrd.allowExternalNameServices=true"
-          {{- end }}
-          {{- if .Values.providers.kubernetesCRD.allowEmptyServices }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesCRD.allowEmptyServices }}
           - "--providers.kubernetescrd.allowEmptyServices=true"
-          {{- end }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesCRD.nativeLBByDefault }}
+          - "--providers.kubernetescrd.nativeLBByDefault=true"
+           {{- end }}
           {{- end }}
           {{- if .Values.providers.kubernetesIngress.enabled }}
           - "--providers.kubernetesingress"
-          {{- if .Values.providers.kubernetesIngress.allowExternalNameServices }}
+           {{- if .Values.providers.kubernetesIngress.allowExternalNameServices }}
           - "--providers.kubernetesingress.allowExternalNameServices=true"
-          {{- end }}
-          {{- if .Values.providers.kubernetesIngress.allowEmptyServices }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesIngress.allowEmptyServices }}
           - "--providers.kubernetesingress.allowEmptyServices=true"
-          {{- end }}
-          {{- if and .Values.service.enabled .Values.providers.kubernetesIngress.publishedService.enabled }}
+           {{- end }}
+           {{- if and .Values.service.enabled .Values.providers.kubernetesIngress.publishedService.enabled }}
           - "--providers.kubernetesingress.ingressendpoint.publishedservice={{ template "providers.kubernetesIngress.publishedServicePath" . }}"
-          {{- end }}
-          {{- if .Values.providers.kubernetesIngress.labelSelector }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesIngress.labelSelector }}
           - "--providers.kubernetesingress.labelSelector={{ .Values.providers.kubernetesIngress.labelSelector }}"
-          {{- end }}
-          {{- if .Values.providers.kubernetesIngress.ingressClass }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesIngress.ingressClass }}
           - "--providers.kubernetesingress.ingressClass={{ .Values.providers.kubernetesIngress.ingressClass }}"
-          {{- end }}
-          {{- if .Values.providers.kubernetesIngress.disableIngressClassLookup }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesIngress.disableIngressClassLookup }}
           - "--providers.kubernetesingress.disableIngressClassLookup=true"
-          {{- end }}
+           {{- end }}
+           {{- if .Values.providers.kubernetesIngress.nativeLBByDefault }}
+          - "--providers.kubernetesingress.nativeLBByDefault=true"
+           {{- end }}
           {{- end }}
           {{- if .Values.experimental.kubernetesGateway.enabled }}
-          - "--providers.kubernetesgateway"
           - "--experimental.kubernetesgateway"
           {{- end }}
           {{- with .Values.providers.kubernetesCRD }}
           {{- if (and .enabled (or .namespaces (and $.Values.rbac.enabled $.Values.rbac.namespaced))) }}
           - "--providers.kubernetescrd.namespaces={{ template "providers.kubernetesCRD.namespaces" $ }}"
           {{- end }}
+          {{- end }}
+          {{- with .Values.providers.kubernetesGateway }}
+           {{- if .enabled }}
+          - "--providers.kubernetesgateway"
+            {{- if or .namespaces (and $.Values.rbac.enabled $.Values.rbac.namespaced) }}
+          - "--providers.kubernetesgateway.namespaces={{ template "providers.kubernetesGateway.namespaces" $ }}"
+            {{- end }}
+            {{- if .experimentalChannel }}
+          - "--providers.kubernetesgateway.experimentalchannel=true"
+            {{- end }}
+            {{- with .labelselector }}
+          - "--providers.kubernetesgateway.labelselector={{ . }}"
+            {{- end }}
+           {{- end }}
           {{- end }}
           {{- with .Values.providers.kubernetesIngress }}
           {{- if (and .enabled (or .namespaces (and $.Values.rbac.enabled $.Values.rbac.namespaced))) }}

@@ -1,6 +1,6 @@
 # traefik
 
-![Version: 28.3.0](https://img.shields.io/badge/Version-28.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.0.3](https://img.shields.io/badge/AppVersion-v3.0.3-informational?style=flat-square)
+![Version: 29.0.0](https://img.shields.io/badge/Version-29.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.0.4](https://img.shields.io/badge/AppVersion-v3.0.4-informational?style=flat-square)
 
 A Traefik based Kubernetes ingress controller
 
@@ -58,6 +58,15 @@ Kubernetes: `>=1.22.0-0`
 | experimental.kubernetesGateway.enabled | bool | `false` | Enable traefik experimental GatewayClass CRD |
 | experimental.plugins | object | `{}` | Enable traefik experimental plugins |
 | extraObjects | list | `[]` | Extra objects to deploy (value evaluated as a template)  In some cases, it can avoid the need for additional, extended or adhoc deployments. See #595 for more details and traefik/tests/values/extra.yaml for example. |
+| gateway.annotations | string | `nil` | Additional gateway annotations (e.g. for cert-manager.io/issuer) |
+| gateway.certificateRefs | string | `nil` | See [GatewayTLSConfig](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io%2fv1.GatewayTLSConfig) |
+| gateway.enabled | bool | `true` | When providers.kubernetesGateway.enabled, deploy a default gateway |
+| gateway.name | string | `nil` | Set a custom name to gateway |
+| gateway.namespace | string | `nil` | By default, Gateway is created in the same `Namespace` than Traefik. |
+| gateway.namespacePolicy | string | `nil` | Routes are restricted to namespace of the gateway [by default](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.FromNamespaces) |
+| gatewayClass.enabled | bool | `true` | When providers.kubernetesGateway.enabled and gateway.enabled, deploy a default gatewayClass |
+| gatewayClass.labels | string | `nil` | Additional gatewayClass labels (e.g. for filtering gateway objects by custom labels) |
+| gatewayClass.name | string | `nil` | Set a custom name to GatewayClass |
 | globalArguments | list | `["--global.checknewversion","--global.sendanonymoususage"]` | Global command arguments to be passed to all traefik's pods |
 | hostNetwork | bool | `false` | If hostNetwork is true, runs traefik in the host network namespace To prevent unschedulabel pods due to port collisions, if hostNetwork=true and replicas>1, a pod anti-affinity is recommended and will be set if the affinity is left as default. |
 | hub.apimanagement.admission.listenAddr | string | `nil` | WebHook admission server listen address. Default: "0.0.0.0:9943". |
@@ -84,7 +93,7 @@ Kubernetes: `>=1.22.0-0`
 | image.tag | string | `nil` | defaults to appVersion |
 | ingressClass | object | `{"enabled":true,"isDefaultClass":true}` | Create a default IngressClass for Traefik |
 | ingressRoute.dashboard.annotations | object | `{}` | Additional ingressRoute annotations (e.g. for kubernetes.io/ingress.class) |
-| ingressRoute.dashboard.enabled | bool | `true` | Create an IngressRoute for the dashboard |
+| ingressRoute.dashboard.enabled | bool | `false` | Create an IngressRoute for the dashboard |
 | ingressRoute.dashboard.entryPoints | list | `["traefik"]` | Specify the allowed entrypoints to use for the dashboard ingress route, (e.g. traefik, web, websecure). By default, it's using traefik entrypoint, which is not exposed. /!\ Do not expose your dashboard without any protection over the internet /!\ |
 | ingressRoute.dashboard.labels | object | `{}` | Additional ingressRoute labels (e.g. for filtering IngressRoute by custom labels) |
 | ingressRoute.dashboard.matchRule | string | `"PathPrefix(`/dashboard`) || PathPrefix(`/api`)"` | The router match rule used for the dashboard ingressRoute |
@@ -135,7 +144,27 @@ Kubernetes: `>=1.22.0-0`
 | metrics.otlp.http.tls.insecureSkipVerify | string | `nil` | When set to true, the TLS connection accepts any certificate presented by the server regardless of the hostnames it covers. |
 | metrics.otlp.http.tls.key | string | `nil` | The path to the private key. When using this option, setting the cert option is required. |
 | metrics.otlp.pushInterval | string | `nil` | Interval at which metrics are sent to the OpenTelemetry Collector. Default: 10s |
+| metrics.prometheus.disableAPICheck | string | `nil` | When set to true, it won't check if Prometheus Operator CRDs are deployed |
 | metrics.prometheus.entryPoint | string | `"metrics"` | Entry point used to expose metrics. |
+| metrics.prometheus.prometheusRule.additionalLabels | string | `nil` |  |
+| metrics.prometheus.prometheusRule.enabled | bool | `false` | Enable optional CR for Prometheus Operator. See EXAMPLES.md for more details. |
+| metrics.prometheus.prometheusRule.namespace | string | `nil` |  |
+| metrics.prometheus.service.annotations | string | `nil` |  |
+| metrics.prometheus.service.enabled | string | `nil` | Create a dedicated metrics service to use with ServiceMonitor |
+| metrics.prometheus.service.labels | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.additionalLabels | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.enableHttp2 | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.enabled | bool | `false` | Enable optional CR for Prometheus Operator. See EXAMPLES.md for more details. |
+| metrics.prometheus.serviceMonitor.followRedirects | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.honorLabels | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.honorTimestamps | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.interval | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.jobLabel | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.metricRelabelings | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.namespace | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.namespaceSelector | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.relabelings | string | `nil` |  |
+| metrics.prometheus.serviceMonitor.scrapeTimeout | string | `nil` |  |
 | namespaceOverride | string | `nil` | This field override the default Release Namespace for Helm. It will not affect optional CRDs such as `ServiceMonitor` and `PrometheusRules` |
 | nodeSelector | object | `{}` | nodeSelector is the simplest recommended form of node selection constraint. |
 | persistence.accessMode | string | `"ReadWriteOnce"` |  |
@@ -179,12 +208,20 @@ Kubernetes: `>=1.22.0-0`
 | providers.kubernetesCRD.allowEmptyServices | bool | `false` | Allows to return 503 when there is no endpoints available |
 | providers.kubernetesCRD.allowExternalNameServices | bool | `false` | Allows to reference ExternalName services in IngressRoute |
 | providers.kubernetesCRD.enabled | bool | `true` | Load Kubernetes IngressRoute provider |
+| providers.kubernetesCRD.ingressClass | string | `nil` | When the parameter is set, only resources containing an annotation with the same value are processed. Otherwise, resources missing the annotation, having an empty value, or the value traefik are processed. It will also set required annotation on Dashboard and Healthcheck IngressRoute when enabled. |
 | providers.kubernetesCRD.namespaces | list | `[]` | Array of namespaces to watch. If left empty, Traefik watches all namespaces. |
+| providers.kubernetesCRD.nativeLBByDefault | string | `nil` | Defines whether to use Native Kubernetes load-balancing mode by default. |
+| providers.kubernetesGateway.enabled | bool | `false` | Enable Traefik Gateway provider for Gateway API |
+| providers.kubernetesGateway.experimentalChannel | bool | `false` | Toggles support for the Experimental Channel resources (Gateway API release channels documentation). This option currently enables support for TCPRoute and TLSRoute. |
+| providers.kubernetesGateway.labelselector | string | `nil` | A label selector can be defined to filter on specific GatewayClass objects only. |
+| providers.kubernetesGateway.namespaces | list | `[]` | Array of namespaces to watch. If left empty, Traefik watches all namespaces. |
 | providers.kubernetesIngress.allowEmptyServices | bool | `false` | Allows to return 503 when there is no endpoints available |
 | providers.kubernetesIngress.allowExternalNameServices | bool | `false` | Allows to reference ExternalName services in Ingress |
 | providers.kubernetesIngress.disableIngressClassLookup | bool | `false` |  |
 | providers.kubernetesIngress.enabled | bool | `true` | Load Kubernetes Ingress provider |
+| providers.kubernetesIngress.ingressClass | string | `nil` | When ingressClass is set, only Ingresses containing an annotation with the same value are processed. Otherwise, Ingresses missing the annotation, having an empty value, or the value traefik are processed. |
 | providers.kubernetesIngress.namespaces | list | `[]` | Array of namespaces to watch. If left empty, Traefik watches all namespaces. |
+| providers.kubernetesIngress.nativeLBByDefault | string | `nil` | Defines whether to use Native Kubernetes load-balancing mode by default. |
 | providers.kubernetesIngress.publishedService.enabled | bool | `false` |  |
 | rbac | object | `{"enabled":true,"namespaced":false,"secretResourceNames":[]}` | Whether Role Based Access Control objects like roles and rolebindings should be created |
 | readinessProbe.failureThreshold | int | `1` | The number of consecutive failures allowed before considering the probe as failed. |

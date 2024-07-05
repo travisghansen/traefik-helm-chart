@@ -369,6 +369,22 @@ extraObjects:
       client-secret: "{{ azure_dns_challenge_application_secret }}"
 ```
 
+# Use an IngressClass
+
+Default install comes with an `IngressClass` resource that can be enabled on providers.
+
+Here's how one can enable it on CRD & Ingress Kubernetes provider:
+
+```yaml
+ingressClass:
+  name: traefik
+providers:
+  kubernetesCRD:
+    ingressClass: traefik
+  kubernetesIngress:
+    ingressClass: traefik
+```
+
 # Use HTTP3
 
 By default, it will use a Load balancers with mixed protocols on `websecure`
@@ -742,3 +758,121 @@ image:
   repository: traefik/traefik
   tag: experimental-v3.0
 ```
+
+# Use Prometheus Operator
+
+An optional support of this operator is included in this Chart. See documentation of this operator for more details.
+
+It can be used with those _values_:
+
+```yaml
+metrics:
+  prometheus:
+    service:
+      enabled: true
+    disableAPICheck: false
+    serviceMonitor:
+      enabled: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          separator: ;
+          regex: ^fluentd_output_status_buffer_(oldest|newest)_.+
+          replacement: $1
+          action: drop
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          separator: ;
+          regex: ^(.*)$
+          targetLabel: nodename
+          replacement: $1
+          action: replace
+      jobLabel: traefik
+      interval: 30s
+      honorLabels: true
+    prometheusRule:
+      enabled: true
+      rules:
+        - alert: TraefikDown
+          expr: up{job="traefik"} == 0
+          for: 5m
+          labels:
+            context: traefik
+            severity: warning
+          annotations:
+            summary: "Traefik Down"
+            description: "{{ $labels.pod }} on {{ $labels.nodename }} is down"
+```
+
+# Use kubernetes Gateway API
+
+One can use the new stable kubernetes gateway API provider setting the following _values_:
+
+```yaml
+image:
+  tag: v3.1.0-rc3
+providers:
+  kubernetesGateway:
+    enabled: true
+```
+
+<details>
+
+<summary>With those values, a whoami service can be exposed with a HTTPRoute</summary>
+
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: traefik/whoami
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+spec:
+  selector:
+    app: whoami
+  ports:
+    - protocol: TCP
+      port: 80
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: whoami
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  hostnames:
+    - whoami.docker.localhost
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /
+
+      backendRefs:
+        - name: whoami
+          port: 80
+          weight: 1
+```
+
+Once it's applied, whoami should be accessible on http://whoami.docker.localhost/
+
+</details>

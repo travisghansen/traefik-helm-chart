@@ -1,6 +1,10 @@
 suite: Dashboard IngressRoute configuration
 templates:
 - dashboard-ingressroute.yaml
+set:
+  ingressRoute:
+    dashboard:
+      enabled: true
 tests:
 - it: should allow disabling dashboard exposure using ingressRoute
   set:
@@ -86,7 +90,7 @@ tests:
         options:
           name: tls-options
           namespace: default
-- it: should use the release name as the default ingress class annotation
+- it: should not set default ingress class annotation
   set:
     ingressRoute:
       dashboard:
@@ -94,15 +98,15 @@ tests:
   asserts:
   - equal:
       path: metadata.annotations
-      value:
-        kubernetes.io/ingress.class: RELEASE-NAME-traefik
+      value: null
 - it: should use the ingress class name for the annotation
   set:
     ingressRoute:
       dashboard:
         enabled: true
-    ingressClass:
-      name: test-class
+    providers:
+      kubernetesCRD:
+        ingressClass: test-class
   asserts:
   - equal:
       path: metadata.annotations
@@ -120,6 +124,5 @@ tests:
   - equal:
       path: metadata.annotations
       value:
-        kubernetes.io/ingress.class: RELEASE-NAME-traefik
         foo: bar
         fis: fas

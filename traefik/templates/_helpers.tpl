@@ -17,10 +17,10 @@ Create chart name and version as used by the chart label.
 {{/*
 Create the chart image name.
 */}}
-
 {{- define "traefik.image-name" -}}
 {{- printf "%s/%s:%s" .Values.image.registry .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) }}
 {{- end -}}
+
 {{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
@@ -107,11 +107,14 @@ Users can provide an override for an explicit service they want bound via `.Valu
 {{/*
 Construct a comma-separated list of whitelisted namespaces
 */}}
-{{- define "providers.kubernetesIngress.namespaces" -}}
-{{- default (include "traefik.namespace" .) (join "," .Values.providers.kubernetesIngress.namespaces) }}
-{{- end -}}
 {{- define "providers.kubernetesCRD.namespaces" -}}
 {{- default (include "traefik.namespace" .) (join "," .Values.providers.kubernetesCRD.namespaces) }}
+{{- end -}}
+{{- define "providers.kubernetesGateway.namespaces" -}}
+{{- default (include "traefik.namespace" .) (join "," .Values.providers.kubernetesGateway.namespaces) }}
+{{- end -}}
+{{- define "providers.kubernetesIngress.namespaces" -}}
+{{- default (include "traefik.namespace" .) (join "," .Values.providers.kubernetesIngress.namespaces) }}
 {{- end -}}
 
 {{/*
