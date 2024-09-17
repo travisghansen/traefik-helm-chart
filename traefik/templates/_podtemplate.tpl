@@ -1,4 +1,5 @@
 {{- define "traefik.podTemplate" }}
+  {{- $version := include "imageVersion" $ }}
     metadata:
       annotations:
       {{- if .Values.deployment.podAnnotations }}
@@ -464,6 +465,9 @@
            {{- if .Values.providers.kubernetesCRD.allowEmptyServices }}
           - "--providers.kubernetescrd.allowEmptyServices=true"
            {{- end }}
+           {{- if and .Values.rbac.namespaced (semverCompare ">=3.1.2-0" $version) }}
+          - "--providers.kubernetescrd.disableClusterScopeResources=true"
+           {{- end }}
            {{- if .Values.providers.kubernetesCRD.nativeLBByDefault }}
           - "--providers.kubernetescrd.nativeLBByDefault=true"
            {{- end }}
@@ -485,8 +489,12 @@
            {{- if .Values.providers.kubernetesIngress.ingressClass }}
           - "--providers.kubernetesingress.ingressClass={{ .Values.providers.kubernetesIngress.ingressClass }}"
            {{- end }}
-           {{- if .Values.providers.kubernetesIngress.disableIngressClassLookup }}
+           {{- if .Values.rbac.namespaced }}
+            {{- if semverCompare "<3.1.2-0" $version }}
           - "--providers.kubernetesingress.disableIngressClassLookup=true"
+            {{- else }}
+          - "--providers.kubernetesingress.disableClusterScopeResources=true"
+            {{- end }}
            {{- end }}
            {{- if .Values.providers.kubernetesIngress.nativeLBByDefault }}
           - "--providers.kubernetesingress.nativeLBByDefault=true"
@@ -624,20 +632,17 @@
             {{- if and .general.format (not (has .general.format (list "common" "json"))) }}
               {{- fail "ERROR: .Values.logs.general.format must be either common or json"  }}
             {{- end }}
-            {{- if .general.format }}
-          - "--log.format={{ .general.format }}"
+            {{- with .general.format }}
+          - "--log.format={{ . }}"
             {{- end }}
-            {{- if .general.filePath }}
-          - "--log.filePath={{ .general.filePath }}"
+            {{- with .general.filePath }}
+          - "--log.filePath={{ . }}"
             {{- end }}
             {{- if and (or (eq .general.format "common") (not .general.format)) (eq .general.noColor true) }}
           - "--log.noColor={{ .general.noColor }}"
             {{- end }}
-            {{- if and .general.level (not (has (.general.level | upper) (list "DEBUG" "PANIC" "FATAL" "ERROR" "WARN" "INFO"))) }}
-              {{- fail "ERROR: .Values.logs.level must be DEBUG, PANIC, FATAL, ERROR, WARN, and INFO"  }}
-            {{- end }}
-            {{- if .general.level }}
-          - "--log.level={{ .general.level | upper }}"
+            {{- with .general.level }}
+          - "--log.level={{ . | upper }}"
             {{- end }}
             {{- if .access.enabled }}
           - "--accesslog=true"

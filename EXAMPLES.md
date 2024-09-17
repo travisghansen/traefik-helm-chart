@@ -416,6 +416,17 @@ ports:
       enabled: true
 ```
 
+You can also create two `Service`, one for TCP and one for UDP:
+
+```yaml
+ports:
+  websecure:
+    http3:
+      enabled: true
+service:
+  single: false
+```
+
 # Use PROXY protocol on Digital Ocean
 
 PROXY protocol is a protocol for sending client connection information, such as origin IP addresses and port numbers, to the final backend server, rather than discarding it at the load balancer.
@@ -822,8 +833,6 @@ metrics:
 One can use the new stable kubernetes gateway API provider setting the following _values_:
 
 ```yaml
-image:
-  tag: v3.1.0-rc3
 providers:
   kubernetesGateway:
     enabled: true
@@ -906,6 +915,8 @@ gateway:
   listeners:
     websecure:
       hostname: whoami.docker.localhost
+      port: 8443
+      protocol: HTTPS
       certificateRefs:
         - name: whoami-tls
 ```

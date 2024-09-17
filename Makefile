@@ -3,7 +3,7 @@
 IMAGE_CHART_TESTING=quay.io/helmpack/chart-testing:v3.11.0
 IMAGE_HELM_CHANGELOG=ghcr.io/traefik/helm-changelog:v0.3.0
 IMAGE_HELM_DOCS=jnorwood/helm-docs:v1.14.2
-IMAGE_HELM_UNITTEST=docker.io/helmunittest/helm-unittest:3.15.3-0.5.1
+IMAGE_HELM_UNITTEST=docker.io/helmunittest/helm-unittest:3.15.4-0.6.1
 
 traefik/tests/__snapshot__:
 	@mkdir traefik/tests/__snapshot__
@@ -19,6 +19,12 @@ docs:
 
 test-install:
 	docker run ${DOCKER_ARGS} --network=host --env GIT_SAFE_DIR="true" --entrypoint /bin/sh --rm -v $(CURDIR):/charts -v $(HOME)/.kube:/root/.kube -w /charts $(IMAGE_CHART_TESTING) /charts/hack/ct.sh install
+
+
+# Requires to install schema generation plugin beforehand
+# $ helm plugin install https://github.com/losisin/helm-values-schema-json.git
+schema:
+	helm schema
 
 changelog:
 	@echo "== Updating Changelogs..."
