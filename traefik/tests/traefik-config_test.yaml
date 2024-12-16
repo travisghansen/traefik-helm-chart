@@ -75,19 +75,19 @@ tests:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetescrd"
 
-  - it: should have disable published Kubernetes service when default configuration
+  - it: should have enabled published Kubernetes service when default configuration
     asserts:
-      - notContains:
+      - contains:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesingress.ingressendpoint.publishedservice=NAMESPACE/RELEASE-NAME-traefik"
-  - it: should have enable published Kubernetes service when specified in configuration
+  - it: should be possible to disable published Kubernetes service when specified in configuration
     set:
       providers:
         kubernetesIngress:
           publishedService:
-            enabled: true
+            enabled: false
     asserts:
-      - contains:
+      - notContains:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesingress.ingressendpoint.publishedservice=NAMESPACE/RELEASE-NAME-traefik"
   - it: should have a custom string in published Kubernetes service when specified in configuration
@@ -101,7 +101,30 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesingress.ingressendpoint.publishedservice=foo/bar"
-
+  - it: should be possible to set statusAddress fields
+    set:
+      providers:
+        kubernetesGateway:
+          enabled: true
+          statusAddress:
+            ip: 1.2.3.4
+            hostname: example.net
+            service:
+              name: foo
+              namespace: default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.statusaddress.ip=1.2.3.4"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.statusaddress.hostname=example.net"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.statusaddress.service.name=foo"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.statusaddress.service.namespace=default"
   - it: should allow cross namespace services when specified in configuration
     set:
       providers:
@@ -215,6 +238,41 @@ tests:
           path: spec.template.spec.containers[0].args
           content: "--experimental.plugins.demo.version=v0.2.1"
 
+  - it: should be possible to configure a customized plugin storage
+    set:
+      experimental:
+        plugins:
+          demo:
+            moduleName: github.com/traefik/plugindemo
+            version: v0.2.1
+      deployment:
+        additionalVolumes:
+          - name: plugins
+            hostPath:
+              path: /data/
+              type: Directory
+      additionalVolumeMounts:
+        - name: plugins
+          mountPath: /plugins-storage
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[2]
+          value:
+            hostPath:
+              path: /data/
+              type: Directory
+            name: plugins
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: plugins
+            mountPath: "/plugins-storage"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--experimental.plugins.demo.moduleName=github.com/traefik/plugindemo"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--experimental.plugins.demo.version=v0.2.1"
   - it: should fail gracefully when using old syntax
     set:
       experimental:
@@ -445,11 +503,9 @@ tests:
       ports:
         websecure:
           forwardedHeaders:
-            insecure: True
-              - 127.0.0.1/32
-              - 192.168.1.7
+            insecure: true
           proxyProtocol:
-            insecure: True
+            insecure: true
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -566,6 +622,33 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesingress.disableIngressClassLookup=true"
+  - it: should not set disableIngressClassLookup if version is >= v3.1.5+ and rbac are namespaced
+    set:
+      rbac:
+        namespaced: true
+      image:
+        tag: v3.1.5
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.disableClusterScopeResources=true"
+
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.disableIngressClassLookup=true"
+  - it: should set disableIngressClassLookup if version is < v3.1.5+ and rbac are namespaced
+    set:
+      rbac:
+        namespaced: true
+      image:
+        tag: v3.1.4
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.disableClusterScopeResources=true"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.disableIngressClassLookup=true"
   - it: should set disableClusterScopeResources when version > v3.1.2+ on both providers
     set:
       rbac:
@@ -623,6 +706,7 @@ tests:
         kubernetesGateway:
           enabled: true
           experimentalChannel: true
+          nativeLBByDefault: true
           labelselector: "app=traefik"
     asserts:
       - contains:
@@ -631,3 +715,25 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesgateway.labelselector=app=traefik"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.nativeLBByDefault=true"
+  - it: should be possible to allow ACME bypass
+    set:
+      ports:
+        websecure:
+          allowACMEByPass: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--entryPoints.websecure.allowACMEByPass=true"
+  - it: should fail when setting ACME bypass with Proxy v3.1.0
+    set:
+      image:
+        tag: v3.1.0
+      ports:
+        websecure:
+          allowACMEByPass: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: allowACMEByPass has been introduced with Traefik v3.1.3+"

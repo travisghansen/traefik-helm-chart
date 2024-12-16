@@ -124,6 +124,25 @@ tests:
               verbs:
                 - update
         template: rbac/clusterrole.yaml
+  - it: ClusterRole should be able to read ingressclass when only kubernetesCRD is enabled
+    set:
+      providers:
+        kubernetesIngress:
+          enabled: false
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - extensions
+              - networking.k8s.io
+            resources:
+              - ingressclasses
+            verbs:
+              - get
+              - list
+              - watch
+        template: rbac/clusterrole.yaml
   - it: ClusterRole should not be able to read CRDs when kubernetesCRD is disabled
     set:
       providers:
@@ -643,7 +662,7 @@ tests:
   - it: should provide expected role rbac when k8s gw api is enabled >=v3.1.0
     set:
       image:
-        tag: v3.1.0-rc2
+        tag: v3.1.0-rc3
       providers:
         kubernetesGateway:
           enabled: true
@@ -717,6 +736,125 @@ tests:
               - list
               - watch
 
+  - it: should provide expected role rbac when k8s gw api is enabled for Proxy >=v3.2.0
+    set:
+      image:
+        tag: v3.2.0-rc1
+      providers:
+        kubernetesGateway:
+          enabled: true
+    asserts:
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - gateway.networking.k8s.io
+            resources:
+              - backendtlspolicies/status
+              - gatewayclasses/status
+              - gateways/status
+              - grpcroutes/status
+              - httproutes/status
+              - tcproutes/status
+              - tlsroutes/status
+            verbs:
+              - update
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - gateway.networking.k8s.io
+            resources:
+              - backendtlspolicies
+              - gatewayclasses
+              - gateways
+              - grpcroutes
+              - httproutes
+              - referencegrants
+              - tcproutes
+              - tlsroutes
+            verbs:
+              - get
+              - list
+              - watch
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - namespaces
+              - secrets
+              - services
+              - configmaps
+            verbs:
+              - get
+              - list
+              - watch
+  - it: should provide expected role rbac when k8s gw api is enabled for Hub >=v3.7.0
+    set:
+      image:
+        tag: v3.7.0
+      hub:
+        token: "xxx"
+      providers:
+        kubernetesGateway:
+          enabled: true
+    asserts:
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - gateway.networking.k8s.io
+            resources:
+              - backendtlspolicies/status
+              - gatewayclasses/status
+              - gateways/status
+              - grpcroutes/status
+              - httproutes/status
+              - tcproutes/status
+              - tlsroutes/status
+            verbs:
+              - update
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - gateway.networking.k8s.io
+            resources:
+              - backendtlspolicies
+              - gatewayclasses
+              - gateways
+              - grpcroutes
+              - httproutes
+              - referencegrants
+              - tcproutes
+              - tlsroutes
+            verbs:
+              - get
+              - list
+              - watch
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - namespaces
+              - secrets
+              - services
+              - configmaps
+            verbs:
+              - get
+              - list
+              - watch
+
   - it: should contain additional RBACS for hub API gateway
     set:
       image:
@@ -735,6 +873,22 @@ tests:
             verbs:
               - get
               - list
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - secrets
+            verbs:
+              - get
+              - list
+              - watch
+              - update
+              - create
+              - delete
+              - deletecollection
       - template: rbac/clusterrole.yaml
         contains:
           path: rules
@@ -774,6 +928,11 @@ tests:
               - apiratelimits
               - apis
               - apiversions
+              - apibundles
+              - apiplans
+              - apicatalogitems
+              - managedsubscriptions
+              - aiservices
             verbs:
               - list
               - watch
@@ -982,7 +1141,7 @@ tests:
               - list
               - get
               - watch
-  - it: should provide expected RBACS for version < v3.1
+  - it: should provide expected RBACS for Proxy version < v3.1
     set:
       image:
         tag: v3.0.1
@@ -1011,4 +1170,67 @@ tests:
             verbs:
               - list
               - get
+              - watch
+  - it: should provide expected RBACS for Hub version <3.3.2
+    set:
+      image:
+        tag: v3.3.0
+      hub:
+        token: "xxx"
+    asserts:
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - endpoints
+              - services
+            verbs:
+              - get
+              - list
+              - watch
+      - template: rbac/clusterrole.yaml
+        notContains:
+          path: rules
+          content:
+            apiGroups:
+              - discovery.k8s.io
+            resources:
+              - endpointslices
+            verbs:
+              - list
+              - get
+              - watch
+  - it: should provide expected RBACS for Hub version >3.3.2 and <3.7.0
+    set:
+      image:
+        tag: v3.6.0
+      hub:
+        token: "xxx"
+    asserts:
+      - template: rbac/clusterrole.yaml
+        notContains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - endpoints
+              - services
+            verbs:
+              - get
+              - list
+              - watch
+      - template: rbac/clusterrole.yaml
+        contains:
+          path: rules
+          content:
+            apiGroups:
+              - discovery.k8s.io
+            resources:
+              - endpointslices
+            verbs:
+              - list
               - watch

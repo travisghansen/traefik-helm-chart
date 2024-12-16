@@ -97,10 +97,10 @@ ingressRoute:
 The traefik admin port can be forwarded locally:
 
 ```bash
-kubectl port-forward $(kubectl get pods --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+kubectl port-forward $(kubectl get pods --selector "app.kubernetes.io/name=traefik" --output=name) 8080:8080
 ```
 
-This command makes the dashboard accessible on the url: http://127.0.0.1:9000/dashboard/
+This command makes the dashboard accessible on the url: http://127.0.0.1:8080/dashboard/
 
 # Publish and protect Traefik Dashboard with basic Auth
 
@@ -173,7 +173,7 @@ extraObjects:
       ports:
       - port: 8080
         name: traefik
-        targetPort: 9000
+        targetPort: 8080
         protocol: TCP
 
   - apiVersion: v1
@@ -305,7 +305,7 @@ extraObjects:
       config:
         type: HTTP
         httpHealthCheck:
-          port: 9000
+          port: 8080
           requestPath: /ping
     targetRef:
       group: ""
@@ -331,14 +331,15 @@ Here is a more complete example, using also native Let's encrypt feature of Trae
 persistence:
   enabled: true
   size: 128Mi
-certResolvers:
+certificatesResolvers:
   letsencrypt:
-    email: "{{ letsencrypt_email }}"
-    #caServer: https://acme-v02.api.letsencrypt.org/directory # Production server
-    caServer: https://acme-staging-v02.api.letsencrypt.org/directory # Staging server
-    dnsChallenge:
-      provider: azuredns
-    storage: /data/acme.json
+    acme:
+      email: "{{ letsencrypt_email }}"
+      #caServer: https://acme-v02.api.letsencrypt.org/directory # Production server
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory # Staging server
+      dnsChallenge:
+        provider: azuredns
+      storage: /data/acme.json
 env:
   - name: AZURE_CLIENT_ID
     value: "{{ azure_dns_challenge_application_id }}"
@@ -459,23 +460,43 @@ ports:
       trustedIPs: *DOTrustedIPs
 ```
 
-# Enable plugin storage
+# Using plugins
 
-This chart follows common security practices: it runs as non root with a readonly root filesystem.
-When enabling a plugin which needs storage, you have to add it to the deployment.
+This chart follows common security practices: it runs as non-root with a readonly root filesystem.
+When enabling a plugin, this Chart provides by default an `emptyDir` for plugin storage.
 
-Here is a simple example with crowdsec. You may want to replace with your plugin or see complete exemple on crowdsec [here](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/kubernetes/README.md).
+Here is an example with [crowdsec](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/kubernetes/README.md) plugin:
+
+```yaml
+experimental:
+  plugins:
+    demo:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.3.5
+```
+
+When persistence is needed, this `emptyDir` can be replaced with a PVC by adding:
 
 ```yaml
 deployment:
   additionalVolumes:
   - name: plugins
+    persistentVolumeClaim:
+      claimName: my-plugins-vol
 additionalVolumeMounts:
 - name: plugins
   mountPath: /plugins-storage
-additionalArguments:
-- "--experimental.plugins.bouncer.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-- "--experimental.plugins.bouncer.version=v1.1.9"
+extraObjects:
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: my-plugins-vol
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
 ```
 
 # Use Traefik native Let's Encrypt integration, without cert-manager
@@ -491,7 +512,7 @@ See [#396](https://github.com/traefik/traefik-helm-chart/issues/396) for more de
 Once the provider is ready, it can be used in an `IngressRoute`:
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: [...]
@@ -501,6 +522,8 @@ spec:
   tls:
     certResolver: letsencrypt
 ```
+
+:information_source: Change `apiVersion` to `traefik.containo.us/v1alpha1` for charts prior to v28.0.0
 
 See [the list of supported providers](https://doc.traefik.io/traefik/https/acme/#providers) for others.
 
@@ -527,11 +550,12 @@ stringData:
 persistence:
   enabled: true
   storageClass: xxx
-certResolvers:
+certificatesResolvers:
   letsencrypt:
-    dnsChallenge:
-      provider: cloudflare
-    storage: /data/acme.json
+    acme:
+      dnsChallenge:
+        provider: cloudflare
+      storage: /data/acme.json
 env:
   - name: CF_DNS_API_TOKEN
     valueFrom:
@@ -550,6 +574,9 @@ podSecurityContext:
   fsGroup: 65532
   fsGroupChangePolicy: "OnRootMismatch"
 ```
+
+>[!NOTE]
+> With [Traefik Hub](https://traefik.io/traefik-hub/), certificates can be stored as a `Secret` on Kubernetes with `distributedAcme` resolver.
 
 # Provide default certificate with cert-manager and CloudFlare DNS
 
@@ -694,7 +721,7 @@ spec:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
   ports:
-  - port: 9000
+  - port: 8080
     name: "traefik"
     targetPort: traefik
     protocol: TCP
@@ -899,6 +926,8 @@ spec:
 Once it's applied, whoami should be accessible on http://whoami.docker.localhost/
 
 </details>
+
+:information_source: In this example, `Deployment` and `HTTPRoute` should be deployed in the same namespace as the Traefik Gateway: Chart namespace.
 
 # Use Kubernetes Gateway API with cert-manager
 

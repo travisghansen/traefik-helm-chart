@@ -1,6 +1,6 @@
 # traefik
 
-![Version: 31.0.0](https://img.shields.io/badge/Version-31.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.1.3](https://img.shields.io/badge/AppVersion-v3.1.3-informational?style=flat-square)
+![Version: 33.2.1](https://img.shields.io/badge/Version-33.2.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.2.2](https://img.shields.io/badge/AppVersion-v3.2.2-informational?style=flat-square)
 
 A Traefik based Kubernetes ingress controller
 
@@ -32,7 +32,7 @@ Kubernetes: `>=1.22.0-0`
 | additionalVolumeMounts | list | `[]` | Additional volumeMounts to add to the Traefik container |
 | affinity | object | `{}` | on nodes where no other traefik pods are scheduled. It should be used when hostNetwork: true to prevent port conflicts |
 | autoscaling.enabled | bool | `false` | Create HorizontalPodAutoscaler object. See EXAMPLES.md for more details. |
-| certResolvers | object | `{}` | Certificates resolvers configuration. Ref: https://doc.traefik.io/traefik/https/acme/#certificate-resolvers See EXAMPLES.md for more details. |
+| certificatesResolvers | object | `{}` | Certificates resolvers configuration. Ref: https://doc.traefik.io/traefik/https/acme/#certificate-resolvers See EXAMPLES.md for more details. |
 | commonLabels | object | `{}` | Add additional label to all resources |
 | core.defaultRuleSyntax | string | `""` | Can be used to use globally v2 router syntax See https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#new-v3-syntax-notable-changes |
 | deployment.additionalContainers | list | `[]` | Additional containers (e.g. for metric offloading sidecars) |
@@ -60,13 +60,15 @@ Kubernetes: `>=1.22.0-0`
 | deployment.runtimeClassName | string | `""` | Set a runtimeClassName on pod |
 | deployment.shareProcessNamespace | bool | `false` | Use process namespace sharing |
 | deployment.terminationGracePeriodSeconds | int | `60` | Amount of time (in seconds) before Kubernetes will send the SIGKILL signal if Traefik does not shut down |
-| env | list | See _values.yaml_ | Environment variables to be passed to Traefik's binary |
+| env | list | See _values.yaml_ | Additional Environment variables to be passed to Traefik's binary |
 | envFrom | list | `[]` | Environment variables to be passed to Traefik's binary from configMaps or secrets |
+| experimental.abortOnPluginFailure | bool | `false` | Defines whether all plugins must be loaded successfully for Traefik to start |
 | experimental.kubernetesGateway.enabled | bool | `false` | Enable traefik experimental GatewayClass CRD |
 | experimental.plugins | object | `{}` | Enable traefik experimental plugins |
 | extraObjects | list | `[]` | Extra objects to deploy (value evaluated as a template)  In some cases, it can avoid the need for additional, extended or adhoc deployments. See #595 for more details and traefik/tests/values/extra.yaml for example. |
 | gateway.annotations | object | `{}` | Additional gateway annotations (e.g. for cert-manager.io/issuer) |
 | gateway.enabled | bool | `true` | When providers.kubernetesGateway.enabled, deploy a default gateway |
+| gateway.infrastructure | object | `{}` | [Infrastructure](https://kubernetes.io/blog/2023/11/28/gateway-api-ga/#gateway-infrastructure-labels) |
 | gateway.listeners | object | `{"web":{"hostname":"","namespacePolicy":null,"port":8000,"protocol":"HTTP"}}` | Define listeners |
 | gateway.listeners.web.hostname | string | `""` | Optional hostname. See [Hostname](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.Hostname) |
 | gateway.listeners.web.namespacePolicy | string | `nil` | Routes are restricted to namespace of the gateway [by default](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.FromNamespaces |
@@ -77,23 +79,23 @@ Kubernetes: `>=1.22.0-0`
 | gatewayClass.labels | object | `{}` | Additional gatewayClass labels (e.g. for filtering gateway objects by custom labels) |
 | gatewayClass.name | string | `""` | Set a custom name to GatewayClass |
 | globalArguments | list | `["--global.checknewversion","--global.sendanonymoususage"]` | Global command arguments to be passed to all traefik's pods |
-| hostNetwork | bool | `false` | If hostNetwork is true, runs traefik in the host network namespace To prevent unschedulabel pods due to port collisions, if hostNetwork=true and replicas>1, a pod anti-affinity is recommended and will be set if the affinity is left as default. |
+| hostNetwork | bool | `false` | If hostNetwork is true, runs traefik in the host network namespace To prevent unschedulable pods due to port collisions, if hostNetwork=true and replicas>1, a pod anti-affinity is recommended and will be set if the affinity is left as default. |
 | hub.apimanagement.admission.listenAddr | string | `""` | WebHook admission server listen address. Default: "0.0.0.0:9943". |
 | hub.apimanagement.admission.secretName | string | `""` | Certificate of the WebHook admission server. Default: "hub-agent-cert". |
 | hub.apimanagement.enabled | bool | `false` | Set to true in order to enable API Management. Requires a valid license token. |
-| hub.ratelimit.redis.cluster | string | `nil` | Enable Redis Cluster. Default: true. |
-| hub.ratelimit.redis.database | string | `nil` | Database used to store information. Default: "0". |
-| hub.ratelimit.redis.endpoints | string | `""` | Endpoints of the Redis instances to connect to. Default: "". |
-| hub.ratelimit.redis.password | string | `""` | The password to use when connecting to Redis endpoints. Default: "". |
-| hub.ratelimit.redis.sentinel.masterset | string | `""` | Name of the set of main nodes to use for main selection. Required when using Sentinel. Default: "". |
-| hub.ratelimit.redis.sentinel.password | string | `""` | Password to use for sentinel authentication (can be different from endpoint password). Default: "". |
-| hub.ratelimit.redis.sentinel.username | string | `""` | Username to use for sentinel authentication (can be different from endpoint username). Default: "". |
-| hub.ratelimit.redis.timeout | string | `""` | Timeout applied on connection with redis. Default: "0s". |
-| hub.ratelimit.redis.tls.ca | string | `""` | Path to the certificate authority used for the secured connection. |
-| hub.ratelimit.redis.tls.cert | string | `""` | Path to the public certificate used for the secure connection. |
-| hub.ratelimit.redis.tls.insecureSkipVerify | bool | `false` | When insecureSkipVerify is set to true, the TLS connection accepts any certificate presented by the server. Default: false. |
-| hub.ratelimit.redis.tls.key | string | `""` | Path to the private key used for the secure connection. |
-| hub.ratelimit.redis.username | string | `""` | The username to use when connecting to Redis endpoints. Default: "". |
+| hub.redis.cluster | string | `nil` | Enable Redis Cluster. Default: true. |
+| hub.redis.database | string | `nil` | Database used to store information. Default: "0". |
+| hub.redis.endpoints | string | `""` | Endpoints of the Redis instances to connect to. Default: "". |
+| hub.redis.password | string | `""` | The password to use when connecting to Redis endpoints. Default: "". |
+| hub.redis.sentinel.masterset | string | `""` | Name of the set of main nodes to use for main selection. Required when using Sentinel. Default: "". |
+| hub.redis.sentinel.password | string | `""` | Password to use for sentinel authentication (can be different from endpoint password). Default: "". |
+| hub.redis.sentinel.username | string | `""` | Username to use for sentinel authentication (can be different from endpoint username). Default: "". |
+| hub.redis.timeout | string | `""` | Timeout applied on connection with redis. Default: "0s". |
+| hub.redis.tls.ca | string | `""` | Path to the certificate authority used for the secured connection. |
+| hub.redis.tls.cert | string | `""` | Path to the public certificate used for the secure connection. |
+| hub.redis.tls.insecureSkipVerify | bool | `false` | When insecureSkipVerify is set to true, the TLS connection accepts any certificate presented by the server. Default: false. |
+| hub.redis.tls.key | string | `""` | Path to the private key used for the secure connection. |
+| hub.redis.username | string | `""` | The username to use when connecting to Redis endpoints. Default: "". |
 | hub.sendlogs | string | `nil` |  |
 | hub.token | string | `""` | Name of `Secret` with key 'token' set to a valid license token. It enables API Gateway. |
 | image.pullPolicy | string | `"IfNotPresent"` | Traefik image pull policy |
@@ -130,14 +132,14 @@ Kubernetes: `>=1.22.0-0`
 | logs.access.fields.general.names | object | `{}` | Names of the fields to limit. |
 | logs.access.fields.headers | object | `{"defaultmode":"drop","names":{}}` | [Limit logged fields or headers](https://doc.traefik.io/traefik/observability/access-logs/#limiting-the-fieldsincluding-headers) |
 | logs.access.fields.headers.defaultmode | string | `"drop"` | Set default mode for fields.headers |
-| logs.access.filters | object | `{}` | Set [filtering](https://docs.traefik.io/observability/access-logs/#filtering) |
+| logs.access.filters | object | `{"minduration":"","retryattempts":false,"statuscodes":""}` | Set [filtering](https://docs.traefik.io/observability/access-logs/#filtering) |
+| logs.access.filters.minduration | string | `""` | Set minDuration, to keep access logs when requests take longer than the specified duration |
+| logs.access.filters.retryattempts | bool | `false` | Set retryAttempts, to keep the access logs when at least one retry has happened |
+| logs.access.filters.statuscodes | string | `""` | Set statusCodes, to limit the access logs to requests with a status codes in the specified range |
 | logs.access.format | string | `nil` | Set [access log format](https://doc.traefik.io/traefik/observability/access-logs/#format) |
-| logs.access.minduration | string | `""` |  |
-| logs.access.retryattempts | bool | `false` |  |
-| logs.access.statuscodes | string | `""` |  |
 | logs.general.filePath | string | `""` | To write the logs into a log file, use the filePath option. |
 | logs.general.format | string | `nil` | Set [logs format](https://doc.traefik.io/traefik/observability/logs/#format) |
-| logs.general.level | string | `"INFO"` | Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO. |
+| logs.general.level | string | `"INFO"` | Alternative logging levels are TRACE, DEBUG, INFO, WARN, ERROR, FATAL, and PANIC. |
 | logs.general.noColor | bool | `false` | When set to true and format is common, it disables the colorized output. |
 | metrics.addInternals | bool | `false` |  |
 | metrics.otlp.addEntryPointsLabels | string | `nil` | Enable metrics on entry points. Default: true |
@@ -190,7 +192,7 @@ Kubernetes: `>=1.22.0-0`
 | nodeSelector | object | `{}` | nodeSelector is the simplest recommended form of node selection constraint. |
 | persistence.accessMode | string | `"ReadWriteOnce"` |  |
 | persistence.annotations | object | `{}` |  |
-| persistence.enabled | bool | `false` | Enable persistence using Persistent Volume Claims ref: http://kubernetes.io/docs/user-guide/persistent-volumes/ It can be used to store TLS certificates, see `storage` in certResolvers |
+| persistence.enabled | bool | `false` | Enable persistence using Persistent Volume Claims ref: http://kubernetes.io/docs/user-guide/persistent-volumes/. It can be used to store TLS certificates along with `certificatesResolvers.<name>.acme.storage`  option |
 | persistence.existingClaim | string | `""` |  |
 | persistence.name | string | `"data"` |  |
 | persistence.path | string | `"/data"` |  |
@@ -206,25 +208,42 @@ Kubernetes: `>=1.22.0-0`
 | ports.metrics.port | int | `9100` | When using hostNetwork, use another port to avoid conflict with node exporter: https://github.com/prometheus/prometheus/wiki/Default-port-allocations |
 | ports.metrics.protocol | string | `"TCP"` | The port protocol (TCP/UDP) |
 | ports.traefik.expose | object | `{"default":false}` | You SHOULD NOT expose the traefik port on production deployments. If you want to access it from outside your cluster, use `kubectl port-forward` or create a secure ingress |
-| ports.traefik.exposedPort | int | `9000` | The exposed port for this service |
-| ports.traefik.port | int | `9000` |  |
+| ports.traefik.exposedPort | int | `8080` | The exposed port for this service |
+| ports.traefik.hostIP | string | `nil` | Use hostIP if set. If not set, Kubernetes will default to 0.0.0.0, which means it's listening on all your interfaces and all your IPs. You may want to set this value if you need traefik to listen on specific interface only. |
+| ports.traefik.hostPort | string | `nil` | Use hostPort if set. |
+| ports.traefik.port | int | `8080` |  |
 | ports.traefik.protocol | string | `"TCP"` | The port protocol (TCP/UDP) |
 | ports.web.expose.default | bool | `true` |  |
 | ports.web.exposedPort | int | `80` |  |
+| ports.web.forwardedHeaders.insecure | bool | `false` |  |
+| ports.web.forwardedHeaders.trustedIPs | list | `[]` | Trust forwarded headers information (X-Forwarded-*). |
+| ports.web.nodePort | string | `nil` | See [upstream documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) |
 | ports.web.port | int | `8000` |  |
 | ports.web.protocol | string | `"TCP"` |  |
+| ports.web.proxyProtocol.insecure | bool | `false` |  |
+| ports.web.proxyProtocol.trustedIPs | list | `[]` | Enable the Proxy Protocol header parsing for the entry point |
+| ports.web.redirectTo | object | `{}` |  |
+| ports.web.targetPort | string | `nil` |  |
 | ports.web.transport | object | `{"keepAliveMaxRequests":null,"keepAliveMaxTime":null,"lifeCycle":{"graceTimeOut":null,"requestAcceptGraceTimeout":null},"respondingTimeouts":{"idleTimeout":null,"readTimeout":null,"writeTimeout":null}}` | Set transport settings for the entrypoint; see also https://doc.traefik.io/traefik/routing/entrypoints/#transport |
+| ports.websecure.allowACMEByPass | bool | `false` | See [upstream documentation](https://doc.traefik.io/traefik/routing/entrypoints/#allowacmebypass) |
+| ports.websecure.appProtocol | string | `nil` | See [upstream documentation](https://kubernetes.io/docs/concepts/services-networking/service/#application-protocol) |
+| ports.websecure.containerPort | string | `nil` |  |
 | ports.websecure.expose.default | bool | `true` |  |
 | ports.websecure.exposedPort | int | `443` |  |
+| ports.websecure.forwardedHeaders.insecure | bool | `false` |  |
+| ports.websecure.forwardedHeaders.trustedIPs | list | `[]` | Trust forwarded headers information (X-Forwarded-*). |
+| ports.websecure.hostPort | string | `nil` |  |
+| ports.websecure.http3.advertisedPort | string | `nil` |  |
 | ports.websecure.http3.enabled | bool | `false` |  |
-| ports.websecure.middlewares | list | `[]` | /!\ It introduces here a link between your static configuration and your dynamic configuration /!\ It follows the provider naming convention: https://doc.traefik.io/traefik/providers/overview/#provider-namespace middlewares:   - namespace-name1@kubernetescrd   - namespace-name2@kubernetescrd |
+| ports.websecure.middlewares | list | `[]` | /!\ It introduces here a link between your static configuration and your dynamic configuration /!\ It follows the provider naming convention: https://doc.traefik.io/traefik/providers/overview/#provider-namespace   - namespace-name1@kubernetescrd   - namespace-name2@kubernetescrd |
+| ports.websecure.nodePort | string | `nil` | See [upstream documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) |
 | ports.websecure.port | int | `8443` |  |
 | ports.websecure.protocol | string | `"TCP"` |  |
-| ports.websecure.tls.certResolver | string | `""` |  |
-| ports.websecure.tls.domains | list | `[]` |  |
-| ports.websecure.tls.enabled | bool | `true` |  |
-| ports.websecure.tls.options | string | `""` |  |
-| ports.websecure.transport | object | `{"keepAliveMaxRequests":null,"keepAliveMaxTime":null,"lifeCycle":{"graceTimeOut":null,"requestAcceptGraceTimeout":null},"respondingTimeouts":{"idleTimeout":null,"readTimeout":null,"writeTimeout":null}}` | Set transport settings for the entrypoint; see also https://doc.traefik.io/traefik/routing/entrypoints/#transport |
+| ports.websecure.proxyProtocol.insecure | bool | `false` |  |
+| ports.websecure.proxyProtocol.trustedIPs | list | `[]` | Enable the Proxy Protocol header parsing for the entry point |
+| ports.websecure.targetPort | string | `nil` |  |
+| ports.websecure.tls | object | `{"certResolver":"","domains":[],"enabled":true,"options":""}` | See [upstream documentation](https://doc.traefik.io/traefik/routing/entrypoints/#tls) |
+| ports.websecure.transport | object | `{"keepAliveMaxRequests":null,"keepAliveMaxTime":null,"lifeCycle":{"graceTimeOut":null,"requestAcceptGraceTimeout":null},"respondingTimeouts":{"idleTimeout":null,"readTimeout":null,"writeTimeout":null}}` | See [upstream documentation](https://doc.traefik.io/traefik/routing/entrypoints/#transport) |
 | priorityClassName | string | `""` | [Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/) |
 | providers.file.content | string | `""` | File content (YAML format, go template supported) (see https://doc.traefik.io/traefik/providers/file/) |
 | providers.file.enabled | bool | `false` | Create a file provider |
@@ -240,13 +259,18 @@ Kubernetes: `>=1.22.0-0`
 | providers.kubernetesGateway.experimentalChannel | bool | `false` | Toggles support for the Experimental Channel resources (Gateway API release channels documentation). This option currently enables support for TCPRoute and TLSRoute. |
 | providers.kubernetesGateway.labelselector | string | `""` | A label selector can be defined to filter on specific GatewayClass objects only. |
 | providers.kubernetesGateway.namespaces | list | `[]` | Array of namespaces to watch. If left empty, Traefik watches all namespaces. |
+| providers.kubernetesGateway.nativeLBByDefault | bool | `false` | Defines whether to use Native Kubernetes load-balancing mode by default. |
+| providers.kubernetesGateway.statusAddress.hostname | string | `""` | This Hostname will get copied to the Gateway status.addresses. |
+| providers.kubernetesGateway.statusAddress.ip | string | `""` | This IP will get copied to the Gateway status.addresses, and currently only supports one IP value (IPv4 or IPv6). |
+| providers.kubernetesGateway.statusAddress.service | object | `{"name":"{{ (include \"traefik.fullname\" .) }}","namespace":"{{ .Release.Namespace }}"}` | The Kubernetes service to copy status addresses from. When using third parties tools like External-DNS, this option can be used to copy the service loadbalancer.status (containing the service's endpoints IPs) to the gateways. Default to Service of this Chart. |
 | providers.kubernetesIngress.allowEmptyServices | bool | `true` | Allows to return 503 when there is no endpoints available |
 | providers.kubernetesIngress.allowExternalNameServices | bool | `false` | Allows to reference ExternalName services in Ingress |
 | providers.kubernetesIngress.enabled | bool | `true` | Load Kubernetes Ingress provider |
 | providers.kubernetesIngress.ingressClass | string | `nil` | When ingressClass is set, only Ingresses containing an annotation with the same value are processed. Otherwise, Ingresses missing the annotation, having an empty value, or the value traefik are processed. |
 | providers.kubernetesIngress.namespaces | list | `[]` | Array of namespaces to watch. If left empty, Traefik watches all namespaces. |
 | providers.kubernetesIngress.nativeLBByDefault | bool | `false` | Defines whether to use Native Kubernetes load-balancing mode by default. |
-| providers.kubernetesIngress.publishedService.enabled | bool | `false` |  |
+| providers.kubernetesIngress.publishedService.enabled | bool | `true` | Enable [publishedService](https://doc.traefik.io/traefik/providers/kubernetes-ingress/#publishedservice) |
+| providers.kubernetesIngress.publishedService.pathOverride | string | `""` | Override path of Kubernetes Service used to copy status from. Format: namespace/servicename. Default to Service deployed with this Chart. |
 | rbac | object | `{"aggregateTo":[],"enabled":true,"namespaced":false,"secretResourceNames":[]}` | Whether Role Based Access Control objects like roles and rolebindings should be created |
 | readinessProbe.failureThreshold | int | `1` | The number of consecutive failures allowed before considering the probe as failed. |
 | readinessProbe.initialDelaySeconds | int | `2` | The number of seconds to wait before starting the first probe. |
@@ -273,8 +297,11 @@ Kubernetes: `>=1.22.0-0`
 | tlsStore | object | `{}` | TLS Store are created as [TLSStore CRDs](https://doc.traefik.io/traefik/https/tls/#default-certificate). This is useful if you want to set a default certificate. See EXAMPLE.md for details. |
 | tolerations | list | `[]` | Tolerations allow the scheduler to schedule pods with matching taints. |
 | topologySpreadConstraints | list | `[]` | You can use topology spread constraints to control how Pods are spread across your cluster among failure-domains. |
-| tracing | object | `{"addInternals":false,"otlp":{"enabled":false,"grpc":{"enabled":false,"endpoint":"","insecure":false,"tls":{"ca":"","cert":"","insecureSkipVerify":false,"key":""}},"http":{"enabled":false,"endpoint":"","headers":{},"tls":{"ca":"","cert":"","insecureSkipVerify":false,"key":""}}}}` | https://doc.traefik.io/traefik/observability/tracing/overview/ |
+| tracing | object | `{"addInternals":false,"capturedRequestHeaders":[],"capturedResponseHeaders":[],"globalAttributes":{},"otlp":{"enabled":false,"grpc":{"enabled":false,"endpoint":"","insecure":false,"tls":{"ca":"","cert":"","insecureSkipVerify":false,"key":""}},"http":{"enabled":false,"endpoint":"","headers":{},"tls":{"ca":"","cert":"","insecureSkipVerify":false,"key":""}}},"safeQueryParams":[],"sampleRate":null,"serviceName":null}` | https://doc.traefik.io/traefik/observability/tracing/overview/ |
 | tracing.addInternals | bool | `false` | Enables tracing for internal resources. Default: false. |
+| tracing.capturedRequestHeaders | list | `[]` | Defines the list of request headers to add as attributes. It applies to client and server kind spans. |
+| tracing.capturedResponseHeaders | list | `[]` | Defines the list of response headers to add as attributes. It applies to client and server kind spans. |
+| tracing.globalAttributes | object | `{}` | Applies a list of shared key:value attributes on all spans. |
 | tracing.otlp.enabled | bool | `false` | See https://doc.traefik.io/traefik/v3.0/observability/tracing/opentelemetry/ |
 | tracing.otlp.grpc.enabled | bool | `false` | Set to true in order to send metrics to the OpenTelemetry Collector using gRPC |
 | tracing.otlp.grpc.endpoint | string | `""` | Format: <scheme>://<host>:<port><path>. Default: http://localhost:4318/v1/metrics |
@@ -290,9 +317,12 @@ Kubernetes: `>=1.22.0-0`
 | tracing.otlp.http.tls.cert | string | `""` | The path to the public certificate. When using this option, setting the key option is required. |
 | tracing.otlp.http.tls.insecureSkipVerify | bool | `false` | When set to true, the TLS connection accepts any certificate presented by the server regardless of the hostnames it covers. |
 | tracing.otlp.http.tls.key | string | `""` | The path to the private key. When using this option, setting the cert option is required. |
+| tracing.safeQueryParams | list | `[]` | By default, all query parameters are redacted. Defines the list of query parameters to not redact. |
+| tracing.sampleRate | string | `nil` | The proportion of requests to trace, specified between 0.0 and 1.0. Default: 1.0. |
+| tracing.serviceName | string | `nil` | Service name used in selected backend. Default: traefik. |
 | updateStrategy.rollingUpdate.maxSurge | int | `1` |  |
 | updateStrategy.rollingUpdate.maxUnavailable | int | `0` |  |
-| updateStrategy.type | string | `"RollingUpdate"` | Customize updateStrategy: RollingUpdate or OnDelete |
+| updateStrategy.type | string | `"RollingUpdate"` | Customize updateStrategy of Deployment or DaemonSet |
 | volumes | list | `[]` | Add volumes to the traefik pod. The volume name will be passed to tpl. This can be used to mount a cert pair or a configmap that holds a config.toml file. After the volume has been mounted, add the configs into traefik by using the `additionalArguments` list below, eg: `additionalArguments: - "--providers.file.filename=/config/dynamic.toml" - "--ping" - "--ping.entrypoint=web"` |
 
 ----------------------------------------------

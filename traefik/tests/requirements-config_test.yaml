@@ -43,6 +43,17 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "ERROR: Before traefik v3.1.0-rc3, kubernetesGateway is experimental. Enable it by setting experimental.kubernetesGateway.enabled to true"
+  - it: should fail when using nativeLBByDefault on kubernetesGateway on traefik < 3.2
+    set:
+      image:
+        tag: v3.1.0
+      providers:
+        kubernetesGateway:
+          enabled: true
+          nativeLBByDefault: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: nativeLBByDefault has been introduced in Kubernetes Gateway provider in v3.2.0"
   - it: should not fail when using kubernetesGateway on traefik > 3.1.0-rc3 without experimental flag
     set:
       image:
@@ -87,3 +98,34 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "ERROR: Kubernetes Gateway provider requires ClusterRole. RBAC cannot be namespaced."
+  - it: should fail when trying to use certResolvers
+    set:
+      certResolvers:
+        myAcmeResolver:
+          email: email@example.com
+          dnsChallenge:
+            provider: myProvider
+            resolvers:
+              - 1.1.1.1
+              - 8.8.8.8
+          tlsChallenge: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: certResolvers setting has been removed. See v33.0.0 Changelog."
+  - it: shouldn't have abortOnPluginFailure, when enabled on traefik < 3.3.0
+    set:
+      experimental:
+        abortOnPluginFailure: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: abortOnPluginFailure is an experimental feature only available for traefik >= v3.3.0."
+  - it: shouldn't have safeQueryParams, when enabled on traefik < 3.1.0
+    set:
+      image:
+        tag: v3.0.0
+      tracing:
+        safeQueryParams:
+         - foo
+    asserts:
+      - failedTemplate:
+          errorMessage: "ERROR: safeQueryParams is a feature only available for traefik >= v3.1.0."

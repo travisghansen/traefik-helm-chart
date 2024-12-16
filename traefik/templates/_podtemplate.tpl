@@ -156,7 +156,7 @@
             mountPath: {{ .mountPath }}
             readOnly: true
           {{- end }}
-          {{- if gt (len .Values.experimental.plugins) 0 }}
+          {{- if and (gt (len .Values.experimental.plugins) 0) (ne (include "traefik.hasPluginsVolume" .Values.deployment.additionalVolumes) "true") }}
           - name: plugins
             mountPath: "/plugins-storage"
           {{- end }}
@@ -383,6 +383,33 @@
           - "--tracing.addinternals"
           {{- end }}
 
+          {{- with .Values.tracing }}
+            {{- with .sampleRate }}
+          - "--tracing.sampleRate={{ . }}"
+            {{- end }}
+
+            {{- with .serviceName }}
+          - "--tracing.serviceName={{ . }}"
+            {{- end }}
+
+            {{- range $name, $value := .globalAttributes }}
+          - "--tracing.globalAttributes.{{ $name }}={{ $value }}"
+            {{- end }}
+
+            {{- range $index, $value := .capturedRequestHeaders }}
+          - "--tracing.capturedRequestHeaders[{{ $index }}]={{ $value }}"
+            {{- end }}
+
+            {{- range $index, $value := .capturedResponseHeaders }}
+          - "--tracing.capturedResponseHeaders[{{ $index }}]={{ $value }}"
+            {{- end }}
+
+            {{- if .safeQueryParams }}
+          - "--tracing.safeQueryParams={{- .safeQueryParams | join "," -}}"
+            {{- end }}
+
+          {{- end }}
+
           {{- with .Values.tracing.otlp }}
           {{- if .enabled }}
           - "--tracing.otlp=true"
@@ -448,6 +475,9 @@
           - "--experimental.plugins.{{ $pluginName }}.moduleName={{ $plugin.moduleName }}"
           - "--experimental.plugins.{{ $pluginName }}.version={{ $plugin.version }}"
           {{- end }}
+          {{- if and (semverCompare ">=v3.3.0-0" $version) (.Values.experimental.abortOnPluginFailure)}}
+          - "--experimental.abortonpluginfailure={{ .Values.experimental.abortOnPluginFailure }}"
+          {{- end }}
           {{- if .Values.providers.kubernetesCRD.enabled }}
           - "--providers.kubernetescrd"
            {{- if .Values.providers.kubernetesCRD.labelSelector }}
@@ -462,10 +492,12 @@
            {{- if .Values.providers.kubernetesCRD.allowExternalNameServices }}
           - "--providers.kubernetescrd.allowExternalNameServices=true"
            {{- end }}
-           {{- if .Values.providers.kubernetesCRD.allowEmptyServices }}
-          - "--providers.kubernetescrd.allowEmptyServices=true"
+           {{- if ne .Values.providers.kubernetesCRD.allowEmptyServices nil }}
+            {{- with .Values.providers.kubernetesCRD.allowEmptyServices | toString }}
+          - "--providers.kubernetescrd.allowEmptyServices={{ . }}"
+            {{- end }}
            {{- end }}
-           {{- if and .Values.rbac.namespaced (semverCompare ">=3.1.2-0" $version) }}
+           {{- if and .Values.rbac.namespaced (semverCompare ">=v3.1.2-0" $version) }}
           - "--providers.kubernetescrd.disableClusterScopeResources=true"
            {{- end }}
            {{- if .Values.providers.kubernetesCRD.nativeLBByDefault }}
@@ -477,8 +509,10 @@
            {{- if .Values.providers.kubernetesIngress.allowExternalNameServices }}
           - "--providers.kubernetesingress.allowExternalNameServices=true"
            {{- end }}
-           {{- if .Values.providers.kubernetesIngress.allowEmptyServices }}
-          - "--providers.kubernetesingress.allowEmptyServices=true"
+           {{- if ne .Values.providers.kubernetesIngress.allowEmptyServices nil }}
+            {{- with .Values.providers.kubernetesIngress.allowEmptyServices | toString }}
+          - "--providers.kubernetesingress.allowEmptyServices={{ . }}"
+            {{- end }}
            {{- end }}
            {{- if and .Values.service.enabled .Values.providers.kubernetesIngress.publishedService.enabled }}
           - "--providers.kubernetesingress.ingressendpoint.publishedservice={{ template "providers.kubernetesIngress.publishedServicePath" . }}"
@@ -490,8 +524,11 @@
           - "--providers.kubernetesingress.ingressClass={{ .Values.providers.kubernetesIngress.ingressClass }}"
            {{- end }}
            {{- if .Values.rbac.namespaced }}
-            {{- if semverCompare "<3.1.2-0" $version }}
+            {{- if semverCompare "<v3.1.5-0" $version }}
           - "--providers.kubernetesingress.disableIngressClassLookup=true"
+              {{- if semverCompare ">=v3.1.2-0" $version }}
+          - "--providers.kubernetesingress.disableClusterScopeResources=true"
+              {{- end }}
             {{- else }}
           - "--providers.kubernetesingress.disableClusterScopeResources=true"
             {{- end }}
@@ -511,6 +548,21 @@
           {{- with .Values.providers.kubernetesGateway }}
            {{- if .enabled }}
           - "--providers.kubernetesgateway"
+            {{- with .statusAddress }}
+             {{- with .ip }}
+          - "--providers.kubernetesgateway.statusaddress.ip={{ . }}"
+             {{- end }}
+             {{- with .hostname }}
+          - "--providers.kubernetesgateway.statusaddress.hostname={{ . }}"
+             {{- end }}
+             {{- with .service }}
+          - "--providers.kubernetesgateway.statusaddress.service.name={{ tpl .name $ }}"
+          - "--providers.kubernetesgateway.statusaddress.service.namespace={{ tpl .namespace $ }}"
+             {{- end }}
+            {{- end }}
+            {{- if .nativeLBByDefault }}
+          - "--providers.kubernetesgateway.nativeLBByDefault=true"
+            {{- end }}
             {{- if or .namespaces (and $.Values.rbac.enabled $.Values.rbac.namespaced) }}
           - "--providers.kubernetesgateway.namespaces={{ template "providers.kubernetesGateway.namespaces" $ }}"
             {{- end }}
@@ -538,9 +590,6 @@
           {{- range $entrypoint, $config := $.Values.ports }}
           {{- if $config }}
             {{- if $config.redirectTo }}
-             {{- if eq (typeOf $config.redirectTo) "string" }}
-               {{- fail "ERROR: Syntax of `ports.web.redirectTo` has changed to `ports.web.redirectTo.port`. Details in PR #934." }}
-             {{- end }}
              {{- $toPort := index $.Values.ports $config.redirectTo.port }}
           - "--entryPoints.{{ $entrypoint }}.http.redirections.entryPoint.to=:{{ $toPort.exposedPort }}"
           - "--entryPoints.{{ $entrypoint }}.http.redirections.entryPoint.scheme=https"
@@ -582,6 +631,12 @@
                   {{- end }}
                 {{- end }}
               {{- end }}
+            {{- end }}
+            {{- if $config.allowACMEByPass }}
+              {{- if (semverCompare "<v3.1.3-0" $version) }}
+                {{- fail "ERROR: allowACMEByPass has been introduced with Traefik v3.1.3+" -}}
+              {{- end }}
+          - "--entryPoints.{{ $entrypoint }}.allowACMEByPass=true"
             {{- end }}
             {{- if $config.forwardedHeaders }}
               {{- if $config.forwardedHeaders.trustedIPs }}
@@ -679,17 +734,7 @@
               {{- end }}
             {{- end }}
           {{- end }}
-          {{- range $resolver, $config := $.Values.certResolvers }}
-          {{- range $option, $setting := $config }}
-          {{- if kindIs "map" $setting }}
-          {{- range $field, $value := $setting }}
-          - "--certificatesresolvers.{{ $resolver }}.acme.{{ $option }}.{{ $field }}={{ if kindIs "slice" $value }}{{ join "," $value }}{{ else }}{{ $value }}{{ end }}"
-          {{- end }}
-          {{- else }}
-          - "--certificatesresolvers.{{ $resolver }}.acme.{{ $option }}={{ $setting }}"
-          {{- end }}
-          {{- end }}
-          {{- end }}
+          {{- include "traefik.yaml2CommandLineArgs" (dict "path" "certificatesresolvers" "content" $.Values.certificatesResolvers) | nindent 10 }}
           {{- with .Values.additionalArguments }}
           {{- range . }}
           - {{ . | quote }}
@@ -714,24 +759,24 @@
             {{- with .platformUrl }}
           - "--hub.platformUrl={{ . }}"
             {{- end -}}
-            {{- range $field, $value := .ratelimit.redis }}
+            {{- range $field, $value := .redis }}
              {{- if has $field (list "cluster" "database" "endpoints" "username" "password" "timeout") -}}
               {{- with $value }}
-          - "--hub.ratelimit.redis.{{ $field }}={{ $value }}"
+          - "--hub.redis.{{ $field }}={{ $value }}"
               {{- end }}
              {{- end }}
             {{- end }}
-            {{- range $field, $value := .ratelimit.redis.sentinel }}
+            {{- range $field, $value := .redis.sentinel }}
              {{- if has $field (list "masterset" "password" "username") -}}
               {{- with $value }}
-          - "--hub.ratelimit.redis.sentinel.{{ $field }}={{ $value }}"
+          - "--hub.redis.sentinel.{{ $field }}={{ $value }}"
               {{- end }}
              {{- end }}
             {{- end }}
-            {{- range $field, $value := .ratelimit.redis.tls }}
+            {{- range $field, $value := .redis.tls }}
              {{- if has $field (list "ca" "cert" "insecureSkipVerify" "key") -}}
               {{- with $value }}
-          - "--hub.ratelimit.redis.tls.{{ $field }}={{ $value }}"
+          - "--hub.redis.tls.{{ $field }}={{ $value }}"
               {{- end }}
              {{- end }}
             {{- end }}
@@ -741,6 +786,14 @@
           {{- end }}
          {{- end }}
         env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           {{- if ($.Values.resources.limits).cpu }}
           - name: GOMAXPROCS
             valueFrom:
@@ -796,7 +849,7 @@
         {{- if .Values.deployment.additionalVolumes }}
           {{- toYaml .Values.deployment.additionalVolumes | nindent 8 }}
         {{- end }}
-        {{- if gt (len .Values.experimental.plugins) 0 }}
+        {{- if and (gt (len .Values.experimental.plugins) 0) (ne (include "traefik.hasPluginsVolume" .Values.deployment.additionalVolumes) "true") }}
         - name: plugins
           emptyDir: {}
         {{- end }}
@@ -825,7 +878,7 @@
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- if .Values.topologySpreadConstraints }}
-      {{- if (semverCompare "<1.19.0-0" .Capabilities.KubeVersion.Version) }}
+      {{- if (semverCompare "<v1.19.0-0" .Capabilities.KubeVersion.Version) }}
         {{- fail "ERROR: topologySpreadConstraints are supported only on kubernetes >= v1.19" -}}
       {{- end }}
       topologySpreadConstraints:

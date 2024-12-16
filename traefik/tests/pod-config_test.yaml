@@ -11,30 +11,28 @@ tests:
         limits:
           cpu: "4"
     asserts:
-      - equal:
-          path: spec.template.spec.containers[0].env[0].name
-          value: GOMAXPROCS
-      - equal:
-          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.resource
-          value: limits.cpu
-      - equal:
-          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.divisor
-          value: "1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMAXPROCS
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.cpu
+                divisor: "1"
   - it: should have set GOMEMLIMIT with cpu limit
     set:
       resources:
         limits:
           memory: "4"
     asserts:
-      - equal:
-          path: spec.template.spec.containers[0].env[0].name
-          value: GOMEMLIMIT
-      - equal:
-          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.resource
-          value: limits.memory
-      - equal:
-          path: spec.template.spec.containers[0].env[0].valueFrom.resourceFieldRef.divisor
-          value: "1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+                divisor: "1"
   - it: should have not set GOMAXPROCS without cpu limit
     asserts:
       - notEqual:
@@ -45,28 +43,24 @@ tests:
       - notEqual:
           path: spec.template.spec.containers[0].env[0].name
           value: GOMEMLIMIT
-  - it: should have env with specified values
+  - it: should have expected env + additional env with specified values
     set:
       env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         - name: POD_TEST
           value: powpow
     asserts:
-      - equal:
-          path: spec.template.spec.containers[0].env[0].name
-          value: POD_NAME
-      - equal:
-          path: spec.template.spec.containers[0].env[0].valueFrom.fieldRef.fieldPath
-          value: metadata.name
-      - equal:
-          path: spec.template.spec.containers[0].env[1].name
-          value: POD_TEST
-      - equal:
-          path: spec.template.spec.containers[0].env[1].value
-          value: powpow
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POD_TEST
+            value: powpow
   - it: should have envFrom with specified values
     set:
       envFrom:
@@ -299,7 +293,7 @@ tests:
           content:
             key: "RSA"
             operator: "Destructor"
-  - it: should have all k8s provider enabled when gateway provider is enabled
+  - it: When gateway provider is enabled, k8s providers & default statusAddress should be set
     set:
       providers:
         kubernetesGateway:
@@ -314,6 +308,12 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--providers.kubernetesgateway"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.statusaddress.service.name=RELEASE-NAME-traefik"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesgateway.statusaddress.service.namespace=NAMESPACE"
   - it: should have experimental flag when set
     set:
       experimental:
@@ -336,15 +336,16 @@ tests:
           content: "--experimental.kubernetesgateway"
   - it: should have the certificate resolver options applied
     set:
-      certResolvers:
+      certificatesResolvers:
         myAcmeResolver:
-          email: email@example.com
-          dnsChallenge:
-            provider: myProvider
-            resolvers:
-              - 1.1.1.1
-              - 8.8.8.8
-          tlsChallenge: true
+          acme:
+            email: email@example.com
+            dnsChallenge:
+              provider: myProvider
+              resolvers:
+                - 1.1.1.1
+                - 8.8.8.8
+            tlsChallenge: true
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -358,6 +359,38 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--certificatesresolvers.myAcmeResolver.acme.tlsChallenge=true"
+
+  - it: should have the distributed acme resolver options applied
+    set:
+      certificatesResolvers:
+        my-resolver:
+          distributedAcme:
+            email: email@example.com
+            storage:
+              kubernetes: true
+            httpChallenge:
+              entrypoint: "web"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--certificatesresolvers.my-resolver.distributedAcme.email=email@example.com"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--certificatesresolvers.my-resolver.distributedAcme.storage.kubernetes=true"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--certificatesresolvers.my-resolver.distributedAcme.httpChallenge.entrypoint=web"
+
+  - it: should have the tailscale resolver options applied
+    set:
+      certificatesResolvers:
+        my-resolver:
+          tailscale: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--certificatesresolvers.my-resolver.tailscale=true"
+
   - it: should have prometheus annotations with specified values
     set:
       ports:
@@ -610,7 +643,7 @@ tests:
     asserts:
       - isNull:
           path: spec.template.spec.containers[0].runtimeClassName
-  - it: should set runtimeClassName when configured
+  - it: should set defaultRuleSyntax when configured
     set:
       core:
         defaultRuleSyntax: v2
@@ -676,3 +709,39 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "level"
+  - it: should set allowEmptyServices for kubernetesCRD
+    set:
+      providers:
+        kubernetesCRD:
+          allowEmptyServices: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetescrd.allowEmptyServices=true"
+  - it: should unset allowEmptyServices for kubernetesCRD
+    set:
+      providers:
+        kubernetesCRD:
+          allowEmptyServices: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetescrd.allowEmptyServices=false"
+  - it: should set allowEmptyServices for kubernetesIngress
+    set:
+      providers:
+        kubernetesIngress:
+          allowEmptyServices: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.allowEmptyServices=true"
+  - it: should unset allowEmptyServices for kubernetesIngress
+    set:
+      providers:
+        kubernetesIngress:
+          allowEmptyServices: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--providers.kubernetesingress.allowEmptyServices=false"
